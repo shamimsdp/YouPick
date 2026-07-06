@@ -303,7 +303,7 @@ app.post("/api/channel/resolve", async (req, res) => {
 
     // System prompt for structured channel extraction
     const response = await activeAi.models.generateContent({
-      model: "gemini-3.5-flash",
+      model: "gemini-2.5-flash",
       contents: `Search the web for details and recent statistics about the YouTube channel or content niche for: "${cleanQuery}".
       Determine its name, standard handle, estimated subscriber count, estimated total videos, and its category niche (select strictly from: "tech", "gaming", "finance", "cooking", "lifestyle", "travel").
       Provide a concise summary description. Ensure the statistics look realistic and grounded.`,
@@ -485,7 +485,7 @@ app.post("/api/generate-ideas", async (req, res) => {
 
     const activeAi = geminiApiKey ? new GoogleGenAI({ apiKey: geminiApiKey, httpOptions: { headers: { "User-Agent": "aistudio-build" } } }) : ai;
     const response = await activeAi.models.generateContent({
-      model: "gemini-3.5-flash",
+      model: "gemini-2.5-flash",
       contents: prompt,
       config: {
         responseMimeType: "application/json",
@@ -1132,14 +1132,284 @@ function initUI() {
   });
 }
 
+// Local helper for YouTube/Gemini queries to bypass server proxy when keys are provided
+async function localResolveChannel(query, apiKey, geminiKey) {
+  let channelId = "";
+  let resolvedQuery = query.trim();
+  if (resolvedQuery.includes("youtube.com/")) {
+    const parts = resolvedQuery.split("youtube.com/");
+    const pathPart = parts[1];
+    if (pathPart.startsWith("@")) {
+      resolvedQuery = pathPart.split("/")[0].split("?")[0];
+    } else if (pathPart.includes("channel/")) {
+      resolvedQuery = pathPart.split("channel/")[1].split("/")[0].split("?")[0];
+    } else if (pathPart.includes("c/")) {
+      resolvedQuery = pathPart.split("c/")[1].split("/")[0].split("?")[0];
+    } else if (pathPart.includes("user/")) {
+      resolvedQuery = pathPart.split("user/")[1].split("/")[0].split("?")[0];
+    }
+  }
+
+  if (resolvedQuery.startsWith("UC") && resolvedQuery.length === 24) {
+    channelId = resolvedQuery;
+  }
+
+  let channelData = null;
+
+  if (channelId) {
+    const url = "https://www.googleapis.com/youtube/v3/channels?part=snippet,statistics,topicDetails&id=" + channelId + "&key=" + apiKey;
+    const response = await fetch(url);
+    const data = await response.json();
+    if (data.items && data.items.length > 0) {
+      channelData = data.items[0];
+    }
+  } else {
+    let handleParam = resolvedQuery;
+    if (!handleParam.startsWith("@")) {
+      handleParam = "@" + handleParam;
+    }
+    const handleUrl = "https://www.googleapis.com/youtube/v3/channels?part=snippet,statistics,topicDetails&forHandle=" + encodeURIComponent(handleParam) + "&key=" + apiKey;
+    const handleResponse = await fetch(handleUrl);
+    const handleData = await handleResponse.json();
+
+    if (handleData.items && handleData.items.length > 0) {
+      channelData = handleData.items[0];
+    } else {
+      const searchUrl = "https://www.googleapis.com/youtube/v3/search?part=snippet&q=" + encodeURIComponent(resolvedQuery) + "&type=channel&maxResults=1&key=" + apiKey;
+      const searchResponse = await fetch(searchUrl);
+      const searchData = await searchResponse.json();
+      if (searchData.items && searchData.items.length > 0) {
+        channelId = searchData.items[0].id.channelId;
+        const detailUrl = "https://www.googleapis.com/youtube/v3/channels?part=snippet,statistics,topicDetails&id=" + channelId + "&key=" + apiKey;
+        const detailRes = await fetch(detailUrl);
+        const detailData = await detailRes.json();
+        if (detailData.items && detailData.items.length > 0) {
+          channelData = detailData.items[0];
+        }
+      }
+    }
+  }
+
+  if (channelData) {
+    let detectedCategory = "lifestyle";
+    if (channelData.topicDetails && channelData.topicDetails.topicIds) {
+      const topicIds = channelData.topicDetails.topicIds;
+      if (topicIds.some(t => t.toLowerCase().includes("tech") || t.toLowerCase().includes("science"))) {
+        detectedCategory = "tech";
+      } else if (topicIds.some(t => t.toLowerCase().includes("game"))) {
+        detectedCategory = "gaming";
+      } else if (topicIds.some(t => t.toLowerCase().includes("business") || t.toLowerCase().includes("finance"))) {
+        detectedCategory = "finance";
+      } else if (topicIds.some(t => t.toLowerCase().includes("cook") || t.toLowerCase().includes("food"))) {
+        detectedCategory = "cooking";
+      } else if (topicIds.some(t => t.toLowerCase().includes("travel"))) {
+        detectedCategory = "travel";
+      }
+    }
+
+    return {
+      id: channelData.id,
+      title: channelData.snippet.title,
+      customUrl: channelData.snippet.customUrl || resolvedQuery,
+      description: channelData.snippet.description,
+      thumbnail: (channelData.snippet.thumbnails && channelData.snippet.thumbnails.high) ? channelData.snippet.thumbnails.high.url : ((channelData.snippet.thumbnails && channelData.snippet.thumbnails.default) ? channelData.snippet.thumbnails.default.url : ""),
+      category: detectedCategory,
+      subscribers: Number(channelData.statistics?.subscriberCount || 0).toLocaleString() || "N/A",
+      videosCount: Number(channelData.statistics?.videoCount || 0).toLocaleString() || "N/A"
+    };
+  }
+
+  if (geminiKey) {
+    const prompt = "Search the web for details and recent statistics about the YouTube channel or content niche for: \"" + resolvedQuery + "\".\n" +
+      "Determine its name, standard handle, estimated subscriber count, estimated total videos, and its category niche (select strictly from: \"tech\", \"gaming\", \"finance\", \"cooking\", \"lifestyle\", \"travel\").\n" +
+      "Provide a concise summary description. Return raw JSON adhering to this schema:\n" +
+      "{\n" +
+      "  \"title\": \"Official name of the channel\",\n" +
+      "  \"customUrl\": \"Handle starting with @\",\n" +
+      "  \"description\": \"One-paragraph summary describing the channel niche and topics\",\n" +
+      "  \"category\": \"Strictly one of: 'tech', 'gaming', 'finance', 'cooking', 'lifestyle', 'travel'\",\n" +
+      "  \"subscribers\": \"e.g. '1.24M subscribers'\",\n" +
+      "  \"videosCount\": \"e.g. '342 videos'\",\n" +
+      "  \"thumbnail\": \"Valid URL of any profile image or fallback like 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe'\"\n" +
+      "}";
+
+    const gemResponse = await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=" + geminiKey, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: {
+          responseMimeType: "application/json"
+        }
+      })
+    });
+    const gemData = await gemResponse.json();
+    const txt = gemData.candidates[0].content.parts[0].text;
+    const parsed = JSON.parse(txt);
+    return parsed;
+  }
+
+  throw new Error("Could not find channel. Please verify handle.");
+}
+
+async function localFetchTrends(category, window, region, apiKey) {
+  const finalCategory = (category || "tech").toLowerCase();
+  const finalRegion = region || "US";
+
+  let categoryId = "";
+  if (finalCategory === "tech") categoryId = "28";
+  else if (finalCategory === "gaming") categoryId = "20";
+  else if (finalCategory === "cooking") categoryId = "26";
+  else if (finalCategory === "lifestyle") categoryId = "22";
+  else if (finalCategory === "travel") categoryId = "19";
+
+  const publishedAfter = new Date();
+  if (window === "24h") {
+    publishedAfter.setHours(publishedAfter.getHours() - 24);
+  } else {
+    publishedAfter.setDate(publishedAfter.getDate() - 7);
+  }
+
+  try {
+    let url = "https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&order=viewCount&publishedAfter=" + publishedAfter.toISOString() + "&regionCode=" + finalRegion + "&maxResults=8&key=" + apiKey;
+    if (categoryId) {
+      url += "&videoCategoryId=" + categoryId;
+    } else {
+      url += "&q=" + encodeURIComponent(finalCategory);
+    }
+
+    const searchRes = await fetch(url);
+    const searchData = await searchRes.json();
+
+    if (searchData.items && searchData.items.length > 0) {
+      const videoIds = searchData.items.map(item => item.id.videoId).join(",");
+      const detailUrl = "https://www.googleapis.com/youtube/v3/videos?part=snippet,statistics&id=" + videoIds + "&key=" + apiKey;
+      const detailRes = await fetch(detailUrl);
+      const detailData = await detailRes.json();
+
+      if (detailData.items) {
+        const processed = detailData.items.map(video => {
+          const viewCount = Number(video.statistics?.viewCount || 0);
+          const publishedAt = video.snippet.publishedAt;
+          const hoursSincePublished = Math.max(1, (Date.now() - new Date(publishedAt).getTime()) / (1000 * 60 * 60));
+          const viewsPerHour = Math.round(viewCount / hoursSincePublished);
+
+          return {
+            id: video.id,
+            title: video.snippet.title,
+            url: "https://youtube.com/watch?v=" + video.id,
+            thumbnail: video.snippet.thumbnails?.high?.url || video.snippet.thumbnails?.medium?.url,
+            viewCount,
+            publishedAt,
+            viewsPerHour,
+            channelTitle: video.snippet.channelTitle,
+          };
+        });
+
+        if (window === "7d") {
+          processed.sort((a, b) => b.viewsPerHour - a.viewsPerHour);
+        } else {
+          processed.sort((a, b) => b.viewCount - a.viewCount);
+        }
+
+        return processed;
+      }
+    }
+  } catch (err) {
+    console.warn("Direct YouTube trends fetch failed:", err);
+  }
+
+  return [];
+}
+
+async function localGenerateIdeas(channel, trends, category, geminiKey) {
+  const modelName = "gemini-2.5-flash";
+  let trendsPrompt = "";
+  if (trends.length > 0) {
+    for (let idx = 0; idx < trends.length; idx++) {
+      const t = trends[idx];
+      trendsPrompt += (idx + 1) + ". Title: \"" + t.title + "\" | Views: " + t.viewCount + " | Channel: \"" + t.channelTitle + "\"\n";
+    }
+  } else {
+    trendsPrompt = "No trends available. Use standard niche topics for inspiration.";
+  }
+
+  const prompt = "You are \"YouPick AI\", an expert YouTube growth assistant.\n" +
+    "Analyze the following YouTube channel profile, niche, and currently performing trend videos.\n" +
+    "Then generate exactly 4 highly engaging, hyper-targeted video ideas (both standard videos and Shorts) that are predicted to perform extremely well.\n\n" +
+    "CHANNEL PROFILE:\n" +
+    "Name: " + channel.title + "\n" +
+    "Handle: " + channel.customUrl + "\n" +
+    "Niche/Category: " + category + "\n" +
+    "Description: " + channel.description + "\n" +
+    "Subscribers: " + channel.subscribers + "\n" +
+    "Total Videos: " + channel.videosCount + "\n\n" +
+    "CURRENT IN-NICHE VIDEO TRENDS (Use as inspiration or contextual cues):\n" +
+    trendsPrompt + "\n\n" +
+    "For each of the 4 ideas, provide:\n" +
+    "1. Title (high-CTR click-worthy title)\n" +
+    "2. Hook (opening 5-second hook script/concept)\n" +
+    "3. Rationale (why this idea will trend, linking back to the channel profile or current trends)\n" +
+    "4. Target Audience (who is this for)\n" +
+    "5. Suggested Format (strictly select either: \"Standard Video\" or \"YouTube Short\")\n\n" +
+    "You must respond with raw JSON in this format:\n" +
+    "{\n" +
+    "  \"ideas\": [\n" +
+    "    {\n" +
+    "      \"title\": \"Title here\",\n" +
+    "      \"hook\": \"Hook concept here\",\n" +
+    "      \"rationale\": \"Rationale here\",\n" +
+    "      \"targetAudience\": \"Target audience details\",\n" +
+    "      \"suggestedFormat\": \"Standard Video\"\n" +
+    "    }\n" +
+    "  ]\n" +
+    "}";
+
+  const res = await fetch("https://generativelanguage.googleapis.com/v1beta/models/" + modelName + ":generateContent?key=" + geminiKey, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      contents: [{ parts: [{ text: prompt }] }],
+      generationConfig: {
+        responseMimeType: "application/json"
+      }
+    })
+  });
+  
+  if (!res.ok) {
+    throw new Error("Gemini API call failed with status " + res.status);
+  }
+
+  const data = await res.json();
+  const txt = data.candidates[0].content.parts[0].text;
+  const parsed = JSON.parse(txt);
+  return parsed.ideas || [];
+}
+
 async function handleAnalyze() {
   const input = document.getElementById("inputChannel").value.trim();
   if (!input) return;
 
   showStatus("Analyzing channel niche...");
+  let usedLocal = false;
+  try {
+    if (CONFIGS.youtubeApiKey && CONFIGS.youtubeApiKey.length > 5) {
+      usedLocal = true;
+      const channel = await localResolveChannel(input, CONFIGS.youtubeApiKey, CONFIGS.geminiApiKey);
+      if (channel) {
+        activeChannel = channel;
+        renderChannelBadge(channel);
+        document.getElementById("btnGenerate").removeAttribute("disabled");
+        hideStatus();
+        return;
+      }
+    }
+  } catch (localErr) {
+    console.warn("Direct local resolve failed, trying server proxy:", localErr);
+  }
+
   let url = "";
   try {
-    // Look up via direct API fallback if keys are missing
     let baseUrl = CONFIGS.proxyUrl || "https://ais-dev-sndbpvhezzyi4mp3mkvsvr-676650229984.asia-east1.run.app";
     url = baseUrl + "/api/channel/resolve";
     const res = await fetch(url, {
@@ -1165,13 +1435,28 @@ async function handleAnalyze() {
       showStatus("Could not resolve channel: " + (channel.error || "No data returned") + ". Try a handle like @Veritasium");
     }
   } catch (err) {
-    showStatus("Resolution failed: " + err.message + " (Target URL: " + url + "). Check internet or try resetting configurations in Options.");
+    const hint = usedLocal ? " (Direct lookup also failed)" : "";
+    showStatus("Resolution failed: " + err.message + hint + " (Target URL: " + url + "). Check internet, verify keys, or try resetting configurations in Options.");
   }
 }
 
 async function handleGenerate() {
   if (!activeChannel) return;
   showStatus("Retrieving trends & generating ideas with Gemini...");
+
+  let usedLocal = false;
+  try {
+    if (CONFIGS.youtubeApiKey && CONFIGS.youtubeApiKey.length > 5 && CONFIGS.geminiApiKey && CONFIGS.geminiApiKey.length > 5) {
+      usedLocal = true;
+      const trends = await localFetchTrends(activeChannel.category, trendWindow, CONFIGS.regionCode, CONFIGS.youtubeApiKey);
+      const ideas = await localGenerateIdeas(activeChannel, trends, activeChannel.category, CONFIGS.geminiApiKey);
+      renderIdeas(ideas);
+      hideStatus();
+      return;
+    }
+  } catch (localErr) {
+    console.warn("Direct local generation failed, trying server proxy:", localErr);
+  }
 
   try {
     let baseUrl = CONFIGS.proxyUrl || "https://ais-dev-sndbpvhezzyi4mp3mkvsvr-676650229984.asia-east1.run.app";
