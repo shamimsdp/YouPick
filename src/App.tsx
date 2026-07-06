@@ -204,6 +204,10 @@ export default function App() {
   "version": "1.0.0",
   "description": "Extract high-velocity YouTube trends and auto-generate custom video ideas using Gemini AI.",
   "permissions": ["storage", "activeTab"],
+  "host_permissions": [
+    "https://*.run.app/",
+    "https://www.googleapis.com/"
+  ],
   "action": {
     "default_popup": "popup.html"
   },

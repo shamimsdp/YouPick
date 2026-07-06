@@ -11,6 +11,18 @@ dotenv.config();
 const app = express();
 app.use(express.json());
 
+// Enable CORS for external origins like the unpacked chrome-extension context
+app.use((req, res, next) => {
+  res.header("Access-Control-Allow-Origin", "*");
+  res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, Authorization");
+  res.header("Access-Control-Allow-Methods", "GET, POST, OPTIONS, PUT, DELETE");
+  if (req.method === "OPTIONS") {
+    res.sendStatus(200);
+    return;
+  }
+  next();
+});
+
 const PORT = 3000;
 
 // Initialize Gemini API
@@ -536,6 +548,10 @@ app.get("/api/extension/download", async (req, res) => {
       version: "1.0.0",
       description: "Generate high-performing YouTube video ideas tailored to your channel category with YouPick.",
       permissions: ["storage", "activeTab"],
+      host_permissions: [
+        "https://*.run.app/",
+        "https://www.googleapis.com/"
+      ],
       action: {
         default_popup: "popup.html"
       },
