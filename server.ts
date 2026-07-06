@@ -186,13 +186,13 @@ const CATEGORY_MAP: Record<string, string> = {
 
 // Endpoint 1: Resolve YouTube Channel URL, Handle or ID
 app.post("/api/channel/resolve", async (req, res) => {
-  const { query } = req.body;
+  const { query, youtubeApiKey, geminiApiKey } = req.body;
   if (!query) {
     res.status(400).json({ error: "Missing channel search query" });
     return;
   }
 
-  const apiKey = process.env.YOUTUBE_API_KEY;
+  const apiKey = youtubeApiKey || process.env.YOUTUBE_API_KEY;
 
   if (apiKey && apiKey.length > 5) {
     try {
@@ -299,9 +299,10 @@ app.post("/api/channel/resolve", async (req, res) => {
   try {
     console.log(`Using Gemini AI to resolve/simulate channel stats for: ${query}`);
     const cleanQuery = query.trim();
+    const activeAi = geminiApiKey ? new GoogleGenAI({ apiKey: geminiApiKey, httpOptions: { headers: { "User-Agent": "aistudio-build" } } }) : ai;
 
     // System prompt for structured channel extraction
-    const response = await ai.models.generateContent({
+    const response = await activeAi.models.generateContent({
       model: "gemini-3.5-flash",
       contents: `Search the web for details and recent statistics about the YouTube channel or content niche for: "${cleanQuery}".
       Determine its name, standard handle, estimated subscriber count, estimated total videos, and its category niche (select strictly from: "tech", "gaming", "finance", "cooking", "lifestyle", "travel").
@@ -354,11 +355,11 @@ app.post("/api/channel/resolve", async (req, res) => {
 
 // Endpoint 2: Get trending/performing videos in a niche & lookback window
 app.post("/api/trends", async (req, res) => {
-  const { category, window, region } = req.body; // window is '24h' or '7d'
+  const { category, window, region, youtubeApiKey } = req.body; // window is '24h' or '7d'
   const finalCategory = (category || "tech").toLowerCase();
   const finalRegion = region || "US";
 
-  const apiKey = process.env.YOUTUBE_API_KEY;
+  const apiKey = youtubeApiKey || process.env.YOUTUBE_API_KEY;
 
   if (apiKey && apiKey.length > 5) {
     try {
@@ -458,7 +459,7 @@ app.post("/api/trends", async (req, res) => {
 
 // Endpoint 3: Generate smart structured video ideas using Gemini AI
 app.post("/api/generate-ideas", async (req, res) => {
-  const { channel, trends, category } = req.body;
+  const { channel, trends, category, geminiApiKey } = req.body;
 
   if (!channel) {
     res.status(400).json({ error: "Missing channel context" });
@@ -482,7 +483,8 @@ app.post("/api/generate-ideas", async (req, res) => {
     Using these high-performing trends as structural reference or inspiration, create 5 unique, highly viral video ideas customized specifically to fit the channel.
     Provide a title that uses YouTube psychological trigger styles, an opening hooks hook/angle, target audience description, detailed growth rationale, and select the best recommended format ('shorts' or 'long-form').`;
 
-    const response = await ai.models.generateContent({
+    const activeAi = geminiApiKey ? new GoogleGenAI({ apiKey: geminiApiKey, httpOptions: { headers: { "User-Agent": "aistudio-build" } } }) : ai;
+    const response = await activeAi.models.generateContent({
       model: "gemini-3.5-flash",
       contents: prompt,
       config: {
@@ -535,7 +537,8 @@ app.post("/api/generate-ideas", async (req, res) => {
 app.get("/api/extension/download", async (req, res) => {
   const ytKey = (req.query.ytKey as string) || "";
   const geminiKey = (req.query.geminiKey as string) || "";
-  const proxyUrl = (req.query.proxyUrl as string) || "https://example-proxy.com";
+  const hostUrl = req.protocol + "://" + req.get("host");
+  const proxyUrl = (req.query.proxyUrl as string) || hostUrl;
   const region = (req.query.region as string) || "US";
 
   try {
@@ -624,7 +627,8 @@ app.get("/api/extension/download", async (req, res) => {
 
             <div class="form-group half">
               <label>Proxy Server URL</label>
-              <input type="text" id="activateProxy" value="https://ais-dev-sndbpvhezzyi4mp3mkvsvr-676650229984.asia-east1.run.app" />
+              <input type="text" id="activateProxy" value="${proxyUrl}" />
+              <button type="button" id="btnResetDefault" style="background:none;border:none;color:#3b82f6;font-size:9px;text-decoration:underline;cursor:pointer;padding:0;margin-top:2px;text-align:left;">Reset to Current Domain</button>
             </div>
           </div>
 
@@ -1047,7 +1051,7 @@ const CONFIGS = {
   youtubeApiKey: "${ytKey}",
   geminiApiKey: "${geminiKey}",
   regionCode: "${region}",
-  proxyUrl: "https://ais-dev-sndbpvhezzyi4mp3mkvsvr-676650229984.asia-east1.run.app",
+  proxyUrl: "${proxyUrl}",
   fallbackActive: true
 };
 
@@ -1081,6 +1085,13 @@ function initUI() {
   const btn24h = document.getElementById("btn24h");
   const btn7d = document.getElementById("btn7d");
   const btnSaveActivation = document.getElementById("btnSaveActivation");
+  const btnResetDefault = document.getElementById("btnResetDefault");
+
+  if (btnResetDefault) {
+    btnResetDefault.addEventListener("click", () => {
+      document.getElementById("activateProxy").value = "${proxyUrl}";
+    });
+  }
 
   if (btnSaveActivation) {
     btnSaveActivation.addEventListener("click", () => {
@@ -1093,7 +1104,9 @@ function initUI() {
       if (ytVal) { CONFIGS.youtubeApiKey = ytVal; updateData.youtubeApiKey = ytVal; }
       if (gemVal) { CONFIGS.geminiApiKey = gemVal; updateData.geminiApiKey = gemVal; }
       if (regVal) { CONFIGS.regionCode = regVal; updateData.regionCode = regVal; }
-      if (prxVal) { CONFIGS.proxyUrl = prxVal; updateData.proxyUrl = prxVal; }
+      // Always store proxyUrl if filled or reset to default
+      CONFIGS.proxyUrl = prxVal || "${proxyUrl}";
+      updateData.proxyUrl = CONFIGS.proxyUrl;
       
       chrome.storage.local.set(updateData, () => {
         document.getElementById("activationView").classList.add("hidden");
@@ -1124,16 +1137,23 @@ async function handleAnalyze() {
   if (!input) return;
 
   showStatus("Analyzing channel niche...");
-  
+  let url = "";
   try {
     // Look up via direct API fallback if keys are missing
     let baseUrl = CONFIGS.proxyUrl || "https://ais-dev-sndbpvhezzyi4mp3mkvsvr-676650229984.asia-east1.run.app";
-    let url = baseUrl + "/api/channel/resolve";
+    url = baseUrl + "/api/channel/resolve";
     const res = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ query: input })
+      body: JSON.stringify({ 
+        query: input,
+        youtubeApiKey: CONFIGS.youtubeApiKey,
+        geminiApiKey: CONFIGS.geminiApiKey
+      })
     });
+    if (!res.ok) {
+      throw new Error("HTTP Status " + res.status + " " + res.statusText);
+    }
     const channel = await res.json();
 
     if (channel && !channel.error) {
@@ -1142,10 +1162,10 @@ async function handleAnalyze() {
       document.getElementById("btnGenerate").removeAttribute("disabled");
       hideStatus();
     } else {
-      showStatus("Could not resolve channel. Try a handle like @Veritasium");
+      showStatus("Could not resolve channel: " + (channel.error || "No data returned") + ". Try a handle like @Veritasium");
     }
   } catch (err) {
-    showStatus("Resolution failed. Check internet or local config.");
+    showStatus("Resolution failed: " + err.message + " (Target URL: " + url + "). Check internet or try resetting configurations in Options.");
   }
 }
 
@@ -1161,8 +1181,16 @@ async function handleGenerate() {
     const trendRes = await fetch(trendsUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ category: activeChannel.category, window: trendWindow, region: CONFIGS.regionCode })
+      body: JSON.stringify({ 
+        category: activeChannel.category, 
+        window: trendWindow, 
+        region: CONFIGS.regionCode,
+        youtubeApiKey: CONFIGS.youtubeApiKey
+      })
     });
+    if (!trendRes.ok) {
+      throw new Error("Trends fetch failed with HTTP " + trendRes.status);
+    }
     const trendsData = await trendRes.json();
     const trends = trendsData.trends || [];
 
@@ -1171,14 +1199,22 @@ async function handleGenerate() {
     const ideaRes = await fetch(ideasUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ channel: activeChannel, trends, category: activeChannel.category })
+      body: JSON.stringify({ 
+        channel: activeChannel, 
+        trends, 
+        category: activeChannel.category,
+        geminiApiKey: CONFIGS.geminiApiKey
+      })
     });
+    if (!ideaRes.ok) {
+      throw new Error("Ideas generator failed with HTTP " + ideaRes.status);
+    }
     const ideasData = await ideaRes.json();
 
     renderIdeas(ideasData.ideas || []);
     hideStatus();
   } catch (err) {
-    showStatus("Failed to generate ideas. Configure keys inside Settings.");
+    showStatus("Failed to generate ideas: " + err.message + ". Check your configurations inside Options.");
   }
 }
 
@@ -1323,7 +1359,16 @@ function hideStatus() {
     </select>
   </div>
 
-  <button id="btnSave">Save Configurations</button>
+  <div class="form-group">
+    <label for="proxyUrl">Proxy Server URL</label>
+    <input type="text" id="proxyUrl" value="${proxyUrl}" />
+    <div class="note">Keep this configured to the active builder domain to route fallbacks properly.</div>
+  </div>
+
+  <div style="display: flex; gap: 10px; margin-top: 16px;">
+    <button id="btnSave">Save Configurations</button>
+    <button id="btnReset" style="background-color: #64748b;">Reset to Defaults</button>
+  </div>
 
   <script src="options.js"></script>
 </body>
@@ -1336,25 +1381,44 @@ function hideStatus() {
   const ytInput = document.getElementById("ytKey");
   const geminiInput = document.getElementById("geminiKey");
   const regionSelect = document.getElementById("region");
+  const proxyInput = document.getElementById("proxyUrl");
   const btnSave = document.getElementById("btnSave");
+  const btnReset = document.getElementById("btnReset");
   const successAlert = document.getElementById("successAlert");
 
   // Load current values
-  chrome.storage.local.get(["youtubeApiKey", "geminiApiKey", "regionCode"], (res) => {
+  chrome.storage.local.get(["youtubeApiKey", "geminiApiKey", "regionCode", "proxyUrl"], (res) => {
     if (res.youtubeApiKey) ytInput.value = res.youtubeApiKey;
     if (res.geminiApiKey) geminiInput.value = res.geminiApiKey;
     if (res.regionCode) regionSelect.value = res.regionCode;
+    proxyInput.value = res.proxyUrl || "${proxyUrl}";
   });
 
   btnSave.addEventListener("click", () => {
     chrome.storage.local.set({
       youtubeApiKey: ytInput.value.trim(),
       geminiApiKey: geminiInput.value.trim(),
-      regionCode: regionSelect.value
+      regionCode: regionSelect.value,
+      proxyUrl: proxyInput.value.trim() || "${proxyUrl}"
     }, () => {
       successAlert.style.display = "block";
       setTimeout(() => {
         successAlert.style.display = "none";
+      }, 3000);
+    });
+  });
+
+  btnReset.addEventListener("click", () => {
+    chrome.storage.local.clear(() => {
+      ytInput.value = "";
+      geminiInput.value = "";
+      regionSelect.value = "US";
+      proxyInput.value = "${proxyUrl}";
+      successAlert.innerText = "Defaults restored successfully!";
+      successAlert.style.display = "block";
+      setTimeout(() => {
+        successAlert.style.display = "none";
+        successAlert.innerText = "Configurations saved successfully!";
       }, 3000);
     });
   });

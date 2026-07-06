@@ -83,7 +83,12 @@ export default function App() {
       const res = await fetch("/api/trends", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ category, window: windowVal, region: configs.regionCode })
+        body: JSON.stringify({ 
+          category, 
+          window: windowVal, 
+          region: configs.regionCode,
+          youtubeApiKey: configs.youtubeApiKey
+        })
       });
       const data = await res.json();
       if (data.trends) {
@@ -104,7 +109,11 @@ export default function App() {
       const res = await fetch("/api/channel/resolve", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ query: queryStr })
+        body: JSON.stringify({ 
+          query: queryStr,
+          youtubeApiKey: configs.youtubeApiKey,
+          geminiApiKey: configs.geminiApiKey
+        })
       });
       const data = await res.json();
       if (data.error) {
@@ -133,7 +142,9 @@ export default function App() {
         body: JSON.stringify({
           channel: activeChannel,
           trends: nicheTrends,
-          category: selectedNiche
+          category: selectedNiche,
+          geminiApiKey: configs.geminiApiKey,
+          youtubeApiKey: configs.youtubeApiKey
         })
       });
       const data = await res.json();
@@ -467,7 +478,8 @@ async function handleGenerate() {
                           ...configs,
                           youtubeApiKey: simYtKey,
                           geminiApiKey: simGeminiKey,
-                          regionCode: simRegion
+                          regionCode: simRegion,
+                          proxyUrl: simProxyUrl
                         });
                       }}
                       className="w-full bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold py-2.5 rounded-xl transition flex items-center justify-center gap-1.5 shadow"
