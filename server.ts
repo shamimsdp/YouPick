@@ -537,17 +537,12 @@ app.get("/api/extension/download", async (req, res) => {
       description: "Extract high-velocity YouTube trends and auto-generate custom video ideas using Gemini AI.",
       permissions: ["storage", "activeTab"],
       action: {
-        default_popup: "popup.html",
-        default_icon: {
-          "16": "icons/icon16.png",
-          "48": "icons/icon48.png",
-          "128": "icons/icon128.png",
-        },
+        default_popup: "popup.html"
       },
       options_page: "options.html",
       background: {
-        service_worker: "background.js",
-      },
+        service_worker: "background.js"
+      }
     };
 
     zip.file("manifest.json", JSON.stringify(manifest, null, 2));
