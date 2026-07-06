@@ -219,8 +219,20 @@ export default function App() {
     "https://*.run.app/",
     "https://www.googleapis.com/"
   ],
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
   "action": {
-    "default_popup": "popup.html"
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
   },
   "options_page": "options.html",
   "background": {
@@ -292,8 +304,11 @@ async function handleGenerate() {
       {/* Premium Top Navigation Bar */}
       <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-slate-200 px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="bg-[#ff0000] text-white p-2 rounded-lg flex items-center justify-center">
-            <Youtube className="w-6 h-6" />
+          <div className="relative w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 to-pink-500 flex items-center justify-center shadow-md shrink-0">
+            <Play className="w-5 h-5 text-white fill-white ml-0.5" />
+            <div className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-amber-400 flex items-center justify-center border-2 border-white shadow-sm">
+              <Check className="w-2.5 h-2.5 text-slate-950 stroke-[3]" />
+            </div>
           </div>
           <div>
             <h1 className="font-semibold text-lg tracking-tight flex items-center gap-2">
@@ -364,8 +379,11 @@ async function handleGenerate() {
               {/* Simulated Extension Header */}
               <header className="bg-slate-950 text-white px-4 py-3 flex items-center justify-between border-b border-slate-800">
                 <div className="flex items-center gap-2">
-                  <div className="bg-[#ff0000] p-1 rounded">
-                    <Youtube className="w-3.5 h-3.5 text-white" />
+                  <div className="relative w-6 h-6 rounded-md bg-gradient-to-br from-violet-500 to-pink-500 flex items-center justify-center shadow-sm shrink-0">
+                    <Play className="w-3 h-3 text-white fill-white ml-0.5" />
+                    <div className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-amber-400 flex items-center justify-center border border-slate-950">
+                      <Check className="w-1.5 h-1.5 text-slate-950 stroke-[3]" />
+                    </div>
                   </div>
                   <span className="font-semibold text-xs tracking-tight">YouPick</span>
                 </div>
