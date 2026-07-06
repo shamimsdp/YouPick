@@ -532,9 +532,9 @@ app.get("/api/extension/download", async (req, res) => {
     // 1. manifest.json
     const manifest = {
       manifest_version: 3,
-      name: "YT Trend Suggestion Engine",
+      name: "YouPick",
       version: "1.0.0",
-      description: "Extract high-velocity YouTube trends and auto-generate custom video ideas using Gemini AI.",
+      description: "Generate high-performing YouTube video ideas tailored to your channel category with YouPick.",
       permissions: ["storage", "activeTab"],
       action: {
         default_popup: "popup.html"
@@ -553,7 +553,7 @@ app.get("/api/extension/download", async (req, res) => {
 <head>
   <meta charset="utf-8">
   <link rel="stylesheet" href="popup.css">
-  <title>YT Trend Generator</title>
+  <title>YouPick</title>
 </head>
 <body>
   <div class="popup-container">
@@ -562,48 +562,99 @@ app.get("/api/extension/download", async (req, res) => {
         <svg class="icon-sparkles" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
         </svg>
-        <h1>YT Trend Engine</h1>
+        <h1>YouPick</h1>
       </div>
       <button id="btnOptions" title="Settings">⚙️</button>
     </header>
 
     <main class="main-content">
-      <div class="channel-section">
-        <input type="text" id="inputChannel" placeholder="Channel Handle (e.g. @Veritasium)" />
-        <button id="btnAnalyze">Analyze</button>
+      <!-- 1. Activation / Onboarding Screen -->
+      <div id="activationView" class="activation-view">
+        <div class="activation-info-card">
+          <h3 class="activation-title">🚀 Activate YouPick Extension</h3>
+          <p class="activation-subtitle">Enter your options below to initiate trend monitoring and Gemini suggestions.</p>
+        </div>
+        
+        <div class="activation-form">
+          <div class="form-group">
+            <label>YouTube Data API Key (Optional)</label>
+            <input type="password" id="activateYtKey" placeholder="Leave blank for secure sandbox proxy" />
+            <div class="help-box">
+              <span class="help-title">💡 How to get YouTube Data API Key:</span>
+              <ol>
+                <li>Go to <a href="https://console.cloud.google.com/" target="_blank">Google Cloud Console</a>.</li>
+                <li>Create/select a project, search for <strong>YouTube Data API v3</strong>, and enable it.</li>
+                <li>Under <strong>Credentials</strong>, click <strong>Create Credentials &gt; API Key</strong>.</li>
+              </ol>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label>Gemini API Key (Optional)</label>
+            <input type="password" id="activateGeminiKey" placeholder="Optional standalone key" />
+          </div>
+
+          <div class="form-row">
+            <div class="form-group half">
+              <label>Default Market</label>
+              <select id="activateRegion">
+                <option value="US">US - United States</option>
+                <option value="GB">GB - United Kingdom</option>
+                <option value="CA">CA - Canada</option>
+                <option value="AU">AU - Australia</option>
+                <option value="IN">IN - India</option>
+              </select>
+            </div>
+
+            <div class="form-group half">
+              <label>Proxy Server URL</label>
+              <input type="text" id="activateProxy" value="https://ais-dev-sndbpvhezzyi4mp3mkvsvr-676650229984.asia-east1.run.app" />
+            </div>
+          </div>
+
+          <button id="btnSaveActivation" class="btn-activate">Activate & Open YouPick</button>
+        </div>
       </div>
 
-      <div id="statusContainer" class="status-box hidden">
-        <span id="statusText">Analyzing channel...</span>
-      </div>
+      <!-- 2. Main Dashboard View -->
+      <div id="dashboardView" class="dashboard-view hidden">
+        <div class="channel-section">
+          <input type="text" id="inputChannel" placeholder="Channel Handle (e.g. @Veritasium)" />
+          <button id="btnAnalyze">Analyze</button>
+        </div>
 
-      <div id="channelBadge" class="channel-badge hidden">
-        <div class="badge-header">
-          <img id="channelAvatar" class="avatar" src="" alt="Avatar" />
-          <div>
-            <h3 id="channelTitle">Channel</h3>
-            <span id="channelNiche" class="niche-tag">Niche</span>
+        <div id="statusContainer" class="status-box hidden">
+          <span id="statusText">Analyzing channel...</span>
+        </div>
+
+        <div id="channelBadge" class="channel-badge hidden">
+          <div class="badge-header">
+            <img id="channelAvatar" class="avatar" src="" alt="Avatar" />
+            <div>
+              <h3 id="channelTitle">Channel</h3>
+              <span id="channelNiche" class="niche-tag">Niche</span>
+            </div>
+          </div>
+          <p id="channelDesc" class="channel-desc"></p>
+        </div>
+
+        <div class="toggle-section">
+          <span class="section-label">Trend Window:</span>
+          <div class="toggle-group">
+            <button id="btn24h" class="toggle-btn active">24 Hours</button>
+            <button id="btn7d" class="toggle-btn">7 Days</button>
           </div>
         </div>
-        <p id="channelDesc" class="channel-desc"></p>
-      </div>
 
-      <div class="toggle-section">
-        <span class="section-label">Trend Window:</span>
-        <div class="toggle-group">
-          <button id="btn24h" class="toggle-btn active">24 Hours</button>
-          <button id="btn7d" class="toggle-btn">7 Days</button>
-        </div>
-      </div>
-
-      <div class="ideas-section">
-        <div class="section-header">
-          <h2>Gemini Ideas</h2>
-          <button id="btnGenerate" class="btn-primary" disabled>Generate Ideas</button>
-        </div>
-        <div id="ideasContainer" class="ideas-list">
-          <div class="empty-state">
-            <p>Connect a YouTube channel to trigger growth suggestions.</p>
+        <div class="ideas-section">
+          <div class="section-header">
+            <h2>Gemini Ideas</h2>
+            <button id="btnGenerate" class="btn-primary" disabled>Generate Ideas</button>
+          </div>
+          <div id="ideasContainer" class="ideas-list">
+            <div class="empty-state">
+              <p>Connect a YouTube channel to trigger YouPick growth suggestions.</p>
+            </div>
           </div>
         </div>
       </div>
@@ -863,6 +914,113 @@ app.get("/api/extension/download", async (req, res) => {
   padding: 24px 16px;
   color: #94a3b8;
   font-size: 12px;
+}
+
+/* Activation Onboarding View Styles */
+.activation-view {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.activation-info-card {
+  background-color: #eff6ff;
+  border: 1px solid #bfdbfe;
+  padding: 10px;
+  border-radius: 8px;
+  color: #1e40af;
+}
+
+.activation-title {
+  margin: 0 0 4px 0;
+  font-size: 13px;
+  font-weight: bold;
+}
+
+.activation-subtitle {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.4;
+  color: #1e3a8a;
+}
+
+.activation-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.form-group label {
+  font-size: 11px;
+  font-weight: 600;
+  color: #475569;
+}
+
+.form-group input, .form-group select {
+  padding: 8px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  font-size: 12px;
+}
+
+.form-row {
+  display: flex;
+  gap: 8px;
+}
+
+.half {
+  flex: 1;
+}
+
+.help-box {
+  background-color: #fffbeb;
+  border: 1px solid #fde68a;
+  padding: 8px;
+  border-radius: 6px;
+  margin-top: 4px;
+}
+
+.help-title {
+  display: block;
+  font-size: 10.5px;
+  font-weight: bold;
+  color: #b45309;
+  margin-bottom: 4px;
+}
+
+.help-box ol {
+  margin: 0;
+  padding-left: 14px;
+  font-size: 10px;
+  color: #d97706;
+  line-height: 1.4;
+}
+
+.help-box ol li {
+  margin-bottom: 2px;
+}
+
+.btn-activate {
+  background-color: #4f46e5;
+  color: white;
+  border: none;
+  padding: 10px;
+  border-radius: 6px;
+  font-weight: 600;
+  font-size: 12px;
+  cursor: pointer;
+  margin-top: 6px;
+  text-align: center;
+}
+
+.btn-activate:hover {
+  background-color: #4338ca;
 }`;
 
     zip.file("popup.css", popupCss);
@@ -873,6 +1031,7 @@ const CONFIGS = {
   youtubeApiKey: "${ytKey}",
   geminiApiKey: "${geminiKey}",
   regionCode: "${region}",
+  proxyUrl: "https://ais-dev-sndbpvhezzyi4mp3mkvsvr-676650229984.asia-east1.run.app",
   fallbackActive: true
 };
 
@@ -880,11 +1039,20 @@ let activeChannel = null;
 let trendWindow = "24h";
 
 document.addEventListener("DOMContentLoaded", () => {
-  // Check Chrome Storage for overrides
-  chrome.storage.local.get(["youtubeApiKey", "geminiApiKey", "regionCode"], (res) => {
+  // Check Chrome Storage for overrides and activation status
+  chrome.storage.local.get(["youtubeApiKey", "geminiApiKey", "regionCode", "proxyUrl", "isActivated"], (res) => {
     if (res.youtubeApiKey) CONFIGS.youtubeApiKey = res.youtubeApiKey;
     if (res.geminiApiKey) CONFIGS.geminiApiKey = res.geminiApiKey;
     if (res.regionCode) CONFIGS.regionCode = res.regionCode;
+    if (res.proxyUrl) CONFIGS.proxyUrl = res.proxyUrl;
+    
+    if (res.isActivated) {
+      document.getElementById("activationView").classList.add("hidden");
+      document.getElementById("dashboardView").classList.remove("hidden");
+    } else {
+      document.getElementById("activationView").classList.remove("hidden");
+      document.getElementById("dashboardView").classList.add("hidden");
+    }
     
     initUI();
   });
@@ -896,6 +1064,27 @@ function initUI() {
   const btnOptions = document.getElementById("btnOptions");
   const btn24h = document.getElementById("btn24h");
   const btn7d = document.getElementById("btn7d");
+  const btnSaveActivation = document.getElementById("btnSaveActivation");
+
+  if (btnSaveActivation) {
+    btnSaveActivation.addEventListener("click", () => {
+      const ytVal = document.getElementById("activateYtKey").value.trim();
+      const gemVal = document.getElementById("activateGeminiKey").value.trim();
+      const regVal = document.getElementById("activateRegion").value;
+      const prxVal = document.getElementById("activateProxy").value.trim();
+      
+      const updateData = { isActivated: true };
+      if (ytVal) { CONFIGS.youtubeApiKey = ytVal; updateData.youtubeApiKey = ytVal; }
+      if (gemVal) { CONFIGS.geminiApiKey = gemVal; updateData.geminiApiKey = gemVal; }
+      if (regVal) { CONFIGS.regionCode = regVal; updateData.regionCode = regVal; }
+      if (prxVal) { CONFIGS.proxyUrl = prxVal; updateData.proxyUrl = prxVal; }
+      
+      chrome.storage.local.set(updateData, () => {
+        document.getElementById("activationView").classList.add("hidden");
+        document.getElementById("dashboardView").classList.remove("hidden");
+      });
+    });
+  }
 
   btnAnalyze.addEventListener("click", handleAnalyze);
   btnGenerate.addEventListener("click", handleGenerate);
@@ -922,7 +1111,8 @@ async function handleAnalyze() {
   
   try {
     // Look up via direct API fallback if keys are missing
-    let url = "https://ais-dev-sndbpvhezzyi4mp3mkvsvr-676650229984.asia-east1.run.app/api/channel/resolve";
+    let baseUrl = CONFIGS.proxyUrl || "https://ais-dev-sndbpvhezzyi4mp3mkvsvr-676650229984.asia-east1.run.app";
+    let url = baseUrl + "/api/channel/resolve";
     const res = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -948,8 +1138,10 @@ async function handleGenerate() {
   showStatus("Retrieving trends & generating ideas with Gemini...");
 
   try {
+    let baseUrl = CONFIGS.proxyUrl || "https://ais-dev-sndbpvhezzyi4mp3mkvsvr-676650229984.asia-east1.run.app";
+    
     // 1. Fetch Niche Trends
-    const trendsUrl = "https://ais-dev-sndbpvhezzyi4mp3mkvsvr-676650229984.asia-east1.run.app/api/trends";
+    const trendsUrl = baseUrl + "/api/trends";
     const trendRes = await fetch(trendsUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -959,7 +1151,7 @@ async function handleGenerate() {
     const trends = trendsData.trends || [];
 
     // 2. Generate Gemini Ideas
-    const ideasUrl = "https://ais-dev-sndbpvhezzyi4mp3mkvsvr-676650229984.asia-east1.run.app/api/generate-ideas";
+    const ideasUrl = baseUrl + "/api/generate-ideas";
     const ideaRes = await fetch(ideasUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -1024,7 +1216,7 @@ function hideStatus() {
 <html>
 <head>
   <meta charset="utf-8">
-  <title>YT Trend Suggestion - Settings</title>
+  <title>YouPick - Settings</title>
   <style>
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
@@ -1157,7 +1349,7 @@ function hideStatus() {
     // 7. background.js
     const backgroundJs = `// Chrome Extension Background Service Worker
 chrome.runtime.onInstalled.addListener(() => {
-  console.log("YouTube Trend Suggestion Engine Installed.");
+  console.log("YouPick Installed.");
 });`;
 
     zip.file("background.js", backgroundJs);
@@ -1169,7 +1361,7 @@ chrome.runtime.onInstalled.addListener(() => {
     zip.file("icons/icon128.png", iconBase64, { base64: true });
 
     // 9. README.txt
-    const readme = `YouTube Trend Suggestion Extension - Manifest V3
+    const readme = `YouPick - Manifest V3
 ==================================================
 
 How to Install in Google Chrome:
@@ -1193,7 +1385,7 @@ Configuration / API Keys:
     const content = await zip.generateAsync({ type: "nodebuffer" });
 
     res.setHeader("Content-Type", "application/zip");
-    res.setHeader("Content-Disposition", "attachment; filename=youtube-trend-extension.zip");
+    res.setHeader("Content-Disposition", "attachment; filename=youpick-extension.zip");
     res.send(content);
   } catch (zipError: any) {
     console.error("ZIP Generation Failed:", zipError);

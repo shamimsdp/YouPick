@@ -1,6 +1,6 @@
 {
-  "name": "YouTube Trend Suggestion Extension",
-  "description": "Generate high-performing YouTube video ideas tailored to your channel category. Real-time trend analytics powered by YouTube Data API and Gemini AI. Mimic and build your Chrome Extension popup direct from this dashboard.",
+  "name": "YouPick",
+  "description": "Generate high-performing YouTube video ideas tailored to your channel category. Real-time trend analytics powered by YouTube Data API and Gemini AI. Mimic, configure, and compile your YouPick Chrome Extension popup direct from this dashboard.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

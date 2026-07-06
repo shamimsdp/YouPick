@@ -56,6 +56,13 @@ export default function App() {
   const [activeCodeTab, setActiveCodeTab] = useState<"manifest" | "popupJs" | "popupHtml">("manifest");
   const [copiedCode, setCopiedCode] = useState(false);
 
+  // Simulated activation states
+  const [isSimulatorActivated, setIsSimulatorActivated] = useState(false);
+  const [simYtKey, setSimYtKey] = useState("");
+  const [simGeminiKey, setSimGeminiKey] = useState("");
+  const [simRegion, setSimRegion] = useState("US");
+  const [simProxyUrl, setSimProxyUrl] = useState(window.location.origin);
+
   // Load saved ideas from local storage
   useEffect(() => {
     const saved = localStorage.getItem("yt_ideas_saved");
@@ -193,7 +200,7 @@ export default function App() {
   const CODE_SNIPPETS = {
     manifest: `{
   "manifest_version": 3,
-  "name": "YouTube Trend Suggestion Engine",
+  "name": "YouPick",
   "version": "1.0.0",
   "description": "Extract high-velocity YouTube trends and auto-generate custom video ideas using Gemini AI.",
   "permissions": ["storage", "activeTab"],
@@ -252,7 +259,7 @@ async function handleGenerate() {
 <body>
   <div class="popup-container">
     <header class="app-header">
-      <h1>YouTube Trend Engine</h1>
+      <h1>YouPick</h1>
     </header>
     <main>
       <input type="text" id="inputChannel" placeholder="@Veritasium" />
@@ -275,7 +282,7 @@ async function handleGenerate() {
           </div>
           <div>
             <h1 className="font-semibold text-lg tracking-tight flex items-center gap-2">
-              YT Trend Suggestion <span className="text-xs bg-indigo-50 text-indigo-600 font-medium px-2 py-0.5 rounded-full border border-indigo-100">Chrome Extension Factory</span>
+              YouPick <span className="text-xs bg-indigo-50 text-indigo-600 font-medium px-2 py-0.5 rounded-full border border-indigo-100">Chrome Extension Factory</span>
             </h1>
             <p className="text-xs text-slate-500">Design, Simulate, and Compile Your Manifest V3 Growth Extension</p>
           </div>
@@ -331,7 +338,7 @@ async function handleGenerate() {
               </div>
               <div className="bg-slate-800 text-[10px] text-slate-400 font-mono px-3 py-0.5 rounded-full flex items-center gap-1">
                 <Globe className="w-2.5 h-2.5 text-slate-500" />
-                chrome-extension://trend-engine/popup.html
+                chrome-extension://youpick/popup.html
               </div>
               <div className="w-4"></div>
             </div>
@@ -345,184 +352,292 @@ async function handleGenerate() {
                   <div className="bg-[#ff0000] p-1 rounded">
                     <Youtube className="w-3.5 h-3.5 text-white" />
                   </div>
-                  <span className="font-semibold text-xs tracking-tight">YT Trend Suggestion</span>
+                  <span className="font-semibold text-xs tracking-tight">YouPick</span>
                 </div>
-                <button 
-                  onClick={() => {
-                    const el = document.getElementById("config-card");
-                    el?.scrollIntoView({ behavior: "smooth" });
-                  }}
-                  className="text-slate-400 hover:text-white transition"
-                  title="Extension Options"
-                >
-                  <Settings className="w-3.5 h-3.5" />
-                </button>
+                <div className="flex items-center gap-2">
+                  <button 
+                    onClick={() => setIsSimulatorActivated(!isSimulatorActivated)}
+                    className="text-slate-400 hover:text-white text-[9px] bg-slate-850 hover:bg-slate-800 px-2 py-0.5 rounded transition"
+                    title="Toggle setup / dashboard screen"
+                  >
+                    {isSimulatorActivated ? "Reset Activation" : "Skip Setup"}
+                  </button>
+                  <button 
+                    onClick={() => {
+                      const el = document.getElementById("config-card");
+                      el?.scrollIntoView({ behavior: "smooth" });
+                    }}
+                    className="text-slate-400 hover:text-white transition"
+                    title="Extension Options"
+                  >
+                    <Settings className="w-3.5 h-3.5" />
+                  </button>
+                </div>
               </header>
 
               {/* Simulated Extension Main Body */}
               <main className="p-4 flex-1 flex flex-col space-y-4 overflow-y-auto max-h-[440px]">
                 
-                {/* 1. Channel Input Box */}
-                <div className="space-y-1.5">
-                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Connect YouTube Channel</label>
-                  <div className="flex gap-1.5">
-                    <div className="relative flex-1">
-                      <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2.5" />
-                      <input 
-                        type="text" 
-                        value={channelQuery}
-                        onChange={(e) => setChannelQuery(e.target.value)}
-                        onKeyDown={(e) => e.key === "Enter" && handleResolveChannel(channelQuery)}
-                        placeholder="Enter channel handle (e.g. @MrBeast)"
-                        className="w-full bg-slate-50 border border-slate-200 text-xs rounded-lg pl-8 pr-2 py-2 focus:outline-none focus:ring-1 focus:ring-indigo-500 transition"
-                      />
-                    </div>
-                    <button 
-                      onClick={() => handleResolveChannel(channelQuery)}
-                      disabled={resolvingChannel}
-                      className="bg-indigo-600 hover:bg-indigo-700 text-white text-[11px] font-medium px-3 rounded-lg transition disabled:opacity-50 flex items-center justify-center min-w-[64px]"
-                    >
-                      {resolvingChannel ? "Analysing..." : "Analyze"}
-                    </button>
-                  </div>
-                </div>
-
-                {/* Status Box or Error Alert */}
-                {errorText && (
-                  <div className="bg-rose-50 border border-rose-100 text-[11px] text-rose-700 p-2.5 rounded-lg flex items-start gap-2">
-                    <AlertCircle className="w-4 h-4 mt-0.5 shrink-0 text-rose-500" />
-                    <span>{errorText}</span>
-                  </div>
-                )}
-
-                {/* 2. Channel Identity Badge (Visible when loaded) */}
-                <AnimatePresence mode="wait">
-                  {activeChannel ? (
-                    <motion.div 
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0 }}
-                      className="bg-slate-50 border border-slate-150 p-3 rounded-xl space-y-2.5"
-                    >
-                      <div className="flex items-center gap-3">
-                        <img 
-                          src={activeChannel.thumbnail} 
-                          alt="Avatar" 
-                          className="w-9 h-9 rounded-full border border-slate-200 object-cover"
-                          referrerPolicy="no-referrer"
-                        />
-                        <div className="min-w-0 flex-1">
-                          <h4 className="font-semibold text-xs text-slate-800 truncate">{activeChannel.title}</h4>
-                          <div className="flex items-center gap-1.5 mt-0.5">
-                            <span className="text-[9px] bg-slate-200 text-slate-700 px-1.5 py-0.5 rounded font-bold uppercase tracking-wider">
-                              {activeChannel.category}
-                            </span>
-                            <span className="text-[10px] text-slate-500 font-mono truncate">{activeChannel.customUrl}</span>
-                          </div>
-                        </div>
+                {!isSimulatorActivated ? (
+                  /* Activation Onboarding View */
+                  <div className="space-y-4 py-1">
+                    <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-3 text-slate-800 space-y-1.5">
+                      <div className="flex items-center gap-1.5 text-xs font-bold text-indigo-900">
+                        <Sparkles className="w-3.5 h-3.5 text-indigo-600 animate-pulse" />
+                        Activate YouPick Extension
                       </div>
-                      <p className="text-[11px] text-slate-600 line-clamp-2 leading-relaxed italic">
-                        "{activeChannel.description || "No description provided."}"
+                      <p className="text-[11px] text-indigo-700 leading-normal">
+                        Welcome to YouPick! To activate and unlock the real-time YouTube growth panel, configure your credentials below.
                       </p>
-                      
-                      {/* Subscriber Counter Stats bar */}
-                      <div className="grid grid-cols-2 gap-2 border-t border-slate-200/60 pt-2 text-[10px] text-slate-500">
-                        <div>
-                          <span className="block text-slate-400">Subscribers</span>
-                          <span className="font-mono font-semibold text-slate-700">{activeChannel.subscribers || "N/A"}</span>
+                    </div>
+
+                    <div className="space-y-3">
+                      <div className="space-y-1">
+                        <div className="flex items-center justify-between">
+                          <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">YouTube Data API Key (Optional)</label>
                         </div>
-                        <div>
-                          <span className="block text-slate-400">Videos Count</span>
-                          <span className="font-mono font-semibold text-slate-700">{activeChannel.videosCount || "N/A"}</span>
+                        <input
+                          type="password"
+                          value={simYtKey}
+                          onChange={(e) => setSimYtKey(e.target.value)}
+                          placeholder="Leave empty for proxy fallback"
+                          className="w-full bg-slate-50 border border-slate-200 text-xs rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-500 transition"
+                        />
+                        <div className="bg-amber-50 border border-amber-100/70 rounded-lg p-2 text-[10.5px] text-amber-800 space-y-1 mt-1">
+                          <p className="font-semibold flex items-center gap-1">
+                            <HelpCircle className="w-3.5 h-3.5 text-amber-600" />
+                            How to get YouTube API Key:
+                          </p>
+                          <ol className="list-decimal pl-3.5 space-y-0.5 text-[10px] text-amber-700 leading-tight">
+                            <li>Go to <a href="https://console.cloud.google.com/" target="_blank" rel="noopener noreferrer" className="underline font-medium">Google Cloud Console</a>.</li>
+                            <li>Enable the <strong className="text-amber-900">"YouTube Data API v3"</strong>.</li>
+                            <li>Navigate to <strong className="text-amber-900">Credentials</strong> & click <strong className="text-amber-900">Create Credentials &gt; API Key</strong>.</li>
+                          </ol>
                         </div>
                       </div>
-                    </motion.div>
-                  ) : (
-                    <motion.div 
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      className="border border-dashed border-slate-200 rounded-xl p-6 text-center text-slate-400 text-xs"
-                    >
-                      No YouTube channel resolved yet. Search a channel name or handle above to begin.
-                    </motion.div>
-                  )}
-                </AnimatePresence>
 
-                {/* 3. Trend Configuration Window Controls */}
-                <div className="flex items-center justify-between border-t border-slate-100 pt-3">
-                  <span className="text-[11px] font-medium text-slate-600">Lookback Performance:</span>
-                  <div className="bg-slate-100 p-0.5 rounded-lg flex">
-                    <button 
-                      onClick={() => handleWindowChange("24h")}
-                      className={`text-[10px] font-medium px-2.5 py-1 rounded-md transition ${trendWindow === "24h" ? "bg-white text-slate-800 shadow-sm" : "text-slate-500 hover:text-slate-800"}`}
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Gemini API Key (Optional)</label>
+                        <input
+                          type="password"
+                          value={simGeminiKey}
+                          onChange={(e) => setSimGeminiKey(e.target.value)}
+                          placeholder="Bake custom API key (optional)"
+                          className="w-full bg-slate-50 border border-slate-200 text-xs rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-500 transition"
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2">
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Regional Market</label>
+                          <select
+                            value={simRegion}
+                            onChange={(e) => setSimRegion(e.target.value)}
+                            className="w-full bg-slate-50 border border-slate-200 text-[11px] rounded-lg px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                          >
+                            <option value="US">United States (US)</option>
+                            <option value="GB">United Kingdom (GB)</option>
+                            <option value="CA">Canada (CA)</option>
+                            <option value="AU">Australia (AU)</option>
+                            <option value="IN">India (IN)</option>
+                          </select>
+                        </div>
+
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Proxy Connection</label>
+                          <input
+                            type="text"
+                            value={simProxyUrl}
+                            onChange={(e) => setSimProxyUrl(e.target.value)}
+                            placeholder="https://..."
+                            className="w-full bg-slate-50 border border-slate-200 text-[11px] rounded-lg px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-500 transition truncate"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={() => {
+                        setIsSimulatorActivated(true);
+                        setConfigs({
+                          ...configs,
+                          youtubeApiKey: simYtKey,
+                          geminiApiKey: simGeminiKey,
+                          regionCode: simRegion
+                        });
+                      }}
+                      className="w-full bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold py-2.5 rounded-xl transition flex items-center justify-center gap-1.5 shadow"
                     >
-                      Today
-                    </button>
-                    <button 
-                      onClick={() => handleWindowChange("7d")}
-                      className={`text-[10px] font-medium px-2.5 py-1 rounded-md transition ${trendWindow === "7d" ? "bg-white text-slate-800 shadow-sm" : "text-slate-500 hover:text-slate-800"}`}
-                    >
-                      This Week
+                      <Check className="w-3.5 h-3.5" />
+                      <span>Activate & Open YouPick</span>
                     </button>
                   </div>
-                </div>
-
-                {/* 4. Action Button for AI Suggestion Generator */}
-                <button 
-                  onClick={handleGenerateIdeas}
-                  disabled={!activeChannel || generatingIdeas}
-                  className="w-full bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold py-2.5 rounded-xl transition flex items-center justify-center gap-1.5 shadow disabled:opacity-50"
-                >
-                  <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-                  <span>{generatingIdeas ? "Consulting Gemini AI..." : "Generate Custom Ideas"}</span>
-                </button>
-
-                {/* 5. Suggestions Stream */}
-                <div className="space-y-3 pt-2">
-                  <h3 className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Generated Video Ideas</h3>
-                  
-                  <div className="space-y-3">
-                    {generatingIdeas ? (
-                      <div className="space-y-2.5 py-4">
-                        <div className="h-10 bg-slate-100 rounded-lg animate-pulse"></div>
-                        <div className="h-16 bg-slate-100 rounded-lg animate-pulse"></div>
-                        <p className="text-[10px] text-slate-400 text-center italic">Gemini is synthesizing views-per-hour metrics...</p>
-                      </div>
-                    ) : generatedIdeas.length > 0 ? (
-                      generatedIdeas.map((idea, idx) => (
-                        <div key={idea.id} className="bg-white border border-slate-200/80 p-3 rounded-xl shadow-sm relative group space-y-1.5">
-                          <span className={`absolute top-2.5 right-2.5 text-[8px] font-bold px-1.5 py-0.5 rounded-full ${idea.suggestedFormat === "shorts" ? "bg-rose-50 text-rose-600 border border-rose-100" : "bg-blue-50 text-blue-600 border border-blue-100"}`}>
-                            {idea.suggestedFormat === "shorts" ? "Shorts" : "Long Form"}
-                          </span>
-                          
-                          <h5 className="font-semibold text-xs text-slate-800 pr-14 leading-snug">{idea.title}</h5>
-                          <p className="text-[11px] text-slate-600 leading-relaxed">
-                            <span className="font-bold text-slate-800">Hook:</span> {idea.hook}
-                          </p>
-                          <p className="text-[11px] text-slate-500 line-clamp-1 leading-normal">
-                            <span className="font-bold text-slate-700">Audience:</span> {idea.targetAudience}
-                          </p>
-
-                          {/* Quick save button */}
-                          <div className="flex justify-between items-center pt-2 border-t border-slate-100 mt-2">
-                            <span className="text-[9px] text-indigo-500 font-medium">Derived from current category trends</span>
-                            <button 
-                              onClick={() => saveIdea(idea)}
-                              className="text-[10px] text-slate-500 hover:text-indigo-600 font-medium flex items-center gap-0.5 transition"
-                            >
-                              <Bookmark className="w-3 h-3" />
-                              Save Concept
-                            </button>
-                          </div>
+                ) : (
+                  /* Main Activated View */
+                  <>
+                    {/* 1. Channel Input Box */}
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Connect YouTube Channel</label>
+                      <div className="flex gap-1.5">
+                        <div className="relative flex-1">
+                          <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2.5" />
+                          <input 
+                            type="text" 
+                            value={channelQuery}
+                            onChange={(e) => setChannelQuery(e.target.value)}
+                            onKeyDown={(e) => e.key === "Enter" && handleResolveChannel(channelQuery)}
+                            placeholder="Enter channel handle (e.g. @MrBeast)"
+                            className="w-full bg-slate-50 border border-slate-200 text-xs rounded-lg pl-8 pr-2 py-2 focus:outline-none focus:ring-1 focus:ring-indigo-500 transition"
+                          />
                         </div>
-                      ))
-                    ) : (
-                      <div className="text-center py-6 text-slate-400 text-xs border border-dashed border-slate-100 rounded-xl">
-                        Click "Generate Custom Ideas" above to load suggestions.
+                        <button 
+                          onClick={() => handleResolveChannel(channelQuery)}
+                          disabled={resolvingChannel}
+                          className="bg-indigo-600 hover:bg-indigo-700 text-white text-[11px] font-medium px-3 rounded-lg transition disabled:opacity-50 flex items-center justify-center min-w-[64px]"
+                        >
+                          {resolvingChannel ? "Analysing..." : "Analyze"}
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Status Box or Error Alert */}
+                    {errorText && (
+                      <div className="bg-rose-50 border border-rose-100 text-[11px] text-rose-700 p-2.5 rounded-lg flex items-start gap-2">
+                        <AlertCircle className="w-4 h-4 mt-0.5 shrink-0 text-rose-500" />
+                        <span>{errorText}</span>
                       </div>
                     )}
-                  </div>
-                </div>
+
+                    {/* 2. Channel Identity Badge (Visible when loaded) */}
+                    <AnimatePresence mode="wait">
+                      {activeChannel ? (
+                        <motion.div 
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0 }}
+                          className="bg-slate-50 border border-slate-150 p-3 rounded-xl space-y-2.5"
+                        >
+                          <div className="flex items-center gap-3">
+                            <img 
+                              src={activeChannel.thumbnail} 
+                              alt="Avatar" 
+                              className="w-9 h-9 rounded-full border border-slate-200 object-cover"
+                              referrerPolicy="no-referrer"
+                            />
+                            <div className="min-w-0 flex-1">
+                              <h4 className="font-semibold text-xs text-slate-800 truncate">{activeChannel.title}</h4>
+                              <div className="flex items-center gap-1.5 mt-0.5">
+                                <span className="text-[9px] bg-slate-200 text-slate-700 px-1.5 py-0.5 rounded font-bold uppercase tracking-wider">
+                                  {activeChannel.category}
+                                </span>
+                                <span className="text-[10px] text-slate-500 font-mono truncate">{activeChannel.customUrl}</span>
+                              </div>
+                            </div>
+                          </div>
+                          <p className="text-[11px] text-slate-600 line-clamp-2 leading-relaxed italic">
+                            "{activeChannel.description || "No description provided."}"
+                          </p>
+                          
+                          {/* Subscriber Counter Stats bar */}
+                          <div className="grid grid-cols-2 gap-2 border-t border-slate-200/60 pt-2 text-[10px] text-slate-500">
+                            <div>
+                              <span className="block text-slate-400">Subscribers</span>
+                              <span className="font-mono font-semibold text-slate-700">{activeChannel.subscribers || "N/A"}</span>
+                            </div>
+                            <div>
+                              <span className="block text-slate-400">Videos Count</span>
+                              <span className="font-mono font-semibold text-slate-700">{activeChannel.videosCount || "N/A"}</span>
+                            </div>
+                          </div>
+                        </motion.div>
+                      ) : (
+                        <motion.div 
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          className="border border-dashed border-slate-200 rounded-xl p-6 text-center text-slate-400 text-xs"
+                        >
+                          No YouTube channel resolved yet. Search a channel name or handle above to begin.
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+
+                    {/* 3. Trend Configuration Window Controls */}
+                    <div className="flex items-center justify-between border-t border-slate-100 pt-3">
+                      <span className="text-[11px] font-medium text-slate-600">Lookback Performance:</span>
+                      <div className="bg-slate-100 p-0.5 rounded-lg flex">
+                        <button 
+                          onClick={() => handleWindowChange("24h")}
+                          className={`text-[10px] font-medium px-2.5 py-1 rounded-md transition ${trendWindow === "24h" ? "bg-white text-slate-800 shadow-sm" : "text-slate-500 hover:text-slate-800"}`}
+                        >
+                          Today
+                        </button>
+                        <button 
+                          onClick={() => handleWindowChange("7d")}
+                          className={`text-[10px] font-medium px-2.5 py-1 rounded-md transition ${trendWindow === "7d" ? "bg-white text-slate-800 shadow-sm" : "text-slate-500 hover:text-slate-800"}`}
+                        >
+                          This Week
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* 4. Action Button for AI Suggestion Generator */}
+                    <button 
+                      onClick={handleGenerateIdeas}
+                      disabled={!activeChannel || generatingIdeas}
+                      className="w-full bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold py-2.5 rounded-xl transition flex items-center justify-center gap-1.5 shadow disabled:opacity-50"
+                    >
+                      <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                      <span>{generatingIdeas ? "Consulting Gemini AI..." : "Generate Custom Ideas"}</span>
+                    </button>
+
+                    {/* 5. Suggestions Stream */}
+                    <div className="space-y-3 pt-2">
+                      <h3 className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Generated Video Ideas</h3>
+                      
+                      <div className="space-y-3">
+                        {generatingIdeas ? (
+                          <div className="space-y-2.5 py-4">
+                            <div className="h-10 bg-slate-100 rounded-lg animate-pulse"></div>
+                            <div className="h-16 bg-slate-100 rounded-lg animate-pulse"></div>
+                            <p className="text-[10px] text-slate-400 text-center italic">Gemini is synthesizing views-per-hour metrics...</p>
+                          </div>
+                        ) : generatedIdeas.length > 0 ? (
+                          generatedIdeas.map((idea, idx) => (
+                            <div key={idea.id} className="bg-white border border-slate-200/80 p-3 rounded-xl shadow-sm relative group space-y-1.5">
+                              <span className={`absolute top-2.5 right-2.5 text-[8px] font-bold px-1.5 py-0.5 rounded-full ${idea.suggestedFormat === "shorts" ? "bg-rose-50 text-rose-600 border border-rose-100" : "bg-blue-50 text-blue-600 border border-blue-100"}`}>
+                                {idea.suggestedFormat === "shorts" ? "Shorts" : "Long Form"}
+                              </span>
+                              
+                              <h5 className="font-semibold text-xs text-slate-800 pr-14 leading-snug">{idea.title}</h5>
+                              <p className="text-[11px] text-slate-600 leading-relaxed">
+                                <span className="font-bold text-slate-800">Hook:</span> {idea.hook}
+                              </p>
+                              <p className="text-[11px] text-slate-500 line-clamp-1 leading-normal">
+                                <span className="font-bold text-slate-700">Audience:</span> {idea.targetAudience}
+                              </p>
+
+                              {/* Quick save button */}
+                              <div className="flex justify-between items-center pt-2 border-t border-slate-100 mt-2">
+                                <span className="text-[9px] text-indigo-500 font-medium">Derived from current category trends</span>
+                                <button 
+                                  onClick={() => saveIdea(idea)}
+                                  className="text-[10px] text-slate-500 hover:text-indigo-600 font-medium flex items-center gap-0.5 transition"
+                                >
+                                  <Bookmark className="w-3 h-3" />
+                                  Save Concept
+                                </button>
+                              </div>
+                            </div>
+                          ))
+                        ) : (
+                          <div className="text-center py-6 text-slate-400 text-xs border border-dashed border-slate-100 rounded-xl">
+                            Click "Generate Custom Ideas" above to load suggestions.
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </>
+                )}
 
               </main>
 
