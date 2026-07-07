@@ -50,7 +50,7 @@ export default function App() {
     youtubeApiKey: "",
     geminiApiKey: "",
     useProxy: true,
-    proxyUrl: window.location.origin,
+    proxyUrl: "http://localhost:5000",
     regionCode: "US"
   });
   const [exporting, setExporting] = useState(false);
@@ -62,7 +62,8 @@ export default function App() {
   const [simYtKey, setSimYtKey] = useState("");
   const [simGeminiKey, setSimGeminiKey] = useState("");
   const [simRegion, setSimRegion] = useState("US");
-  const [simProxyUrl, setSimProxyUrl] = useState(window.location.origin);
+  const [simProxyUrl, setSimProxyUrl] = useState("http://localhost:5000");
+  const [activeSimTab, setActiveSimTab] = useState<"trends" | "ideas">("trends");
 
   // Load saved simulator states & ideas from local storage
   useEffect(() => {
@@ -627,9 +628,24 @@ async function handleGenerate() {
                             <div className="min-w-0 flex-1">
                               <h4 className="font-semibold text-xs text-slate-800 truncate">{activeChannel.title}</h4>
                               <div className="flex items-center gap-1.5 mt-0.5">
-                                <span className="text-[9px] bg-slate-200 text-slate-700 px-1.5 py-0.5 rounded font-bold uppercase tracking-wider">
-                                  {activeChannel.category}
-                                </span>
+                                <select 
+                                  value={selectedNiche}
+                                  onChange={(e) => {
+                                    const val = e.target.value;
+                                    setSelectedNiche(val);
+                                    localStorage.setItem("yt_selected_niche", val);
+                                    fetchTrends(val, trendWindow);
+                                  }}
+                                  className="text-[9px] bg-slate-200 text-slate-700 px-1.5 py-0.5 rounded font-bold uppercase tracking-wider border-none focus:outline-none focus:ring-1 focus:ring-indigo-500 cursor-pointer"
+                                >
+                                  <option value="tech">Tech</option>
+                                  <option value="gaming">Gaming</option>
+                                  <option value="finance">Finance</option>
+                                  <option value="cooking">Cooking</option>
+                                  <option value="lifestyle">Lifestyle</option>
+                                  <option value="travel">Travel</option>
+                                  <option value="kids">Kids</option>
+                                </select>
                                 <span className="text-[10px] text-slate-500 font-mono truncate">{activeChannel.customUrl}</span>
                               </div>
                             </div>
@@ -661,125 +677,147 @@ async function handleGenerate() {
                       )}
                     </AnimatePresence>
 
-                     {/* 3. Trend Configuration Window Controls */}
-                    <div className="flex items-center justify-between border-t border-slate-100 pt-3">
-                      <span className="text-[11px] font-medium text-slate-600">Lookback Performance:</span>
-                      <div className="bg-slate-100 p-0.5 rounded-lg flex">
-                        <button 
-                          onClick={() => handleWindowChange("24h")}
-                          className={`text-[10px] font-medium px-2.5 py-1 rounded-md transition ${trendWindow === "24h" ? "bg-white text-slate-800 shadow-sm" : "text-slate-500 hover:text-slate-800"}`}
-                        >
-                          Today
-                        </button>
-                        <button 
-                          onClick={() => handleWindowChange("7d")}
-                          className={`text-[10px] font-medium px-2.5 py-1 rounded-md transition ${trendWindow === "7d" ? "bg-white text-slate-800 shadow-sm" : "text-slate-500 hover:text-slate-800"}`}
-                        >
-                          This Week
-                        </button>
-                      </div>
+                    {/* Tabs Navigation */}
+                    <div className="flex border-b border-slate-100 mt-3 shrink-0">
+                      <button 
+                        onClick={() => setActiveSimTab("trends")}
+                        className={`flex-1 text-center pb-2 text-[11px] font-bold border-b-2 transition ${activeSimTab === "trends" ? "border-indigo-600 text-indigo-600" : "border-transparent text-slate-400 hover:text-slate-600"}`}
+                      >
+                        Trend Window
+                      </button>
+                      <button 
+                        onClick={() => setActiveSimTab("ideas")}
+                        className={`flex-1 text-center pb-2 text-[11px] font-bold border-b-2 transition ${activeSimTab === "ideas" ? "border-indigo-600 text-indigo-600" : "border-transparent text-slate-400 hover:text-slate-600"}`}
+                      >
+                        Gemini Ideas
+                      </button>
                     </div>
 
-                    {/* Simulator Niche Trends List */}
-                    {activeChannel && (
-                      <div className="border-t border-slate-100 pt-3 space-y-2">
-                        <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">
-                          Niche Trends ({activeChannel.category})
-                        </span>
-                        {loadingTrends ? (
-                          <div className="text-center py-4 text-xs text-slate-400">Loading trends...</div>
-                        ) : nicheTrends.length === 0 ? (
-                          <div className="text-center py-4 text-xs text-slate-400">No trends found.</div>
-                        ) : (
-                          <div className="space-y-1.5 max-h-[160px] overflow-y-auto pr-1">
-                            {nicheTrends.map((trend: any) => {
-                              const viewStr = Number(trend.viewCount || 0).toLocaleString();
-                              const vphStr = trend.viewsPerHour ? `${trend.viewsPerHour}/hr` : "";
-                              return (
-                                <div key={trend.id || trend.title} className="flex gap-2 items-center bg-slate-50 hover:bg-slate-100 border border-slate-100 rounded-lg p-1.5 transition">
-                                  <img 
-                                    className="w-12 h-8 rounded object-cover bg-slate-200 flex-shrink-0" 
-                                    src={trend.thumbnail || "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe"} 
-                                    alt="Thumb" 
-                                    referrerPolicy="no-referrer"
-                                  />
-                                  <div className="min-width-0 flex-1 overflow-hidden">
-                                    <h4 className="text-[11px] font-medium text-slate-800 truncate">
-                                      <a href={trend.url} target="_blank" rel="noopener noreferrer" className="hover:text-blue-600 hover:underline">
-                                        {trend.title}
-                                      </a>
-                                    </h4>
-                                    <div className="flex justify-between text-[9px] text-slate-500 mt-0.5">
-                                      <span className="truncate max-w-[100px]">{trend.channelTitle}</span>
-                                      <span>
-                                        {viewStr} views {vphStr && <span className="text-emerald-500 font-semibold ml-1">{vphStr}</span>}
-                                      </span>
+                    {activeSimTab === "trends" ? (
+                      <div className="space-y-4 pt-3 flex-1 flex flex-col min-h-0">
+                        {/* 3. Trend Configuration Window Controls */}
+                        <div className="flex items-center justify-between">
+                          <span className="text-[11px] font-medium text-slate-600">Lookback Performance:</span>
+                          <div className="bg-slate-100 p-0.5 rounded-lg flex">
+                            <button 
+                              onClick={() => handleWindowChange("24h")}
+                              className={`text-[10px] font-medium px-2.5 py-1 rounded-md transition ${trendWindow === "24h" ? "bg-white text-slate-800 shadow-sm" : "text-slate-500 hover:text-slate-800"}`}
+                            >
+                              Today
+                            </button>
+                            <button 
+                              onClick={() => handleWindowChange("7d")}
+                              className={`text-[10px] font-medium px-2.5 py-1 rounded-md transition ${trendWindow === "7d" ? "bg-white text-slate-800 shadow-sm" : "text-slate-500 hover:text-slate-800"}`}
+                            >
+                              This Week
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Simulator Niche Trends List */}
+                        {activeChannel && (
+                          <div className="space-y-2 flex-1 flex flex-col min-h-0">
+                            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">
+                              Niche Trends ({selectedNiche})
+                            </span>
+                            {loadingTrends ? (
+                              <div className="text-center py-4 text-xs text-slate-400">Loading trends...</div>
+                            ) : nicheTrends.length === 0 ? (
+                              <div className="text-center py-4 text-xs text-slate-400">No trends found.</div>
+                            ) : (
+                              <div className="space-y-1.5 overflow-y-auto pr-1 flex-1 max-h-[220px]">
+                                {nicheTrends.map((trend: any) => {
+                                  const viewStr = Number(trend.viewCount || 0).toLocaleString();
+                                  const vphStr = trend.viewsPerHour ? `${trend.viewsPerHour}/hr` : "";
+                                  return (
+                                    <div key={trend.id || trend.title} className="flex gap-2 items-center bg-slate-50 hover:bg-slate-100 border border-slate-100 rounded-lg p-1.5 transition">
+                                      <img 
+                                        className="w-12 h-8 rounded object-cover bg-slate-200 flex-shrink-0" 
+                                        src={trend.thumbnail || "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe"} 
+                                        alt="Thumb" 
+                                        referrerPolicy="no-referrer"
+                                      />
+                                      <div className="min-width-0 flex-1 overflow-hidden">
+                                        <h4 className="text-[11px] font-medium text-slate-800 truncate">
+                                          <a href={trend.url} target="_blank" rel="noopener noreferrer" className="hover:text-blue-600 hover:underline">
+                                            {trend.title}
+                                          </a>
+                                        </h4>
+                                        <div className="flex justify-between text-[9px] text-slate-500 mt-0.5">
+                                          <span className="truncate max-w-[100px]">{trend.channelTitle}</span>
+                                          <span>
+                                            {viewStr} views {vphStr && <span className="text-emerald-500 font-semibold ml-1">{vphStr}</span>}
+                                          </span>
+                                        </div>
+                                      </div>
                                     </div>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="space-y-4 pt-3 flex-1 flex flex-col min-h-0">
+                        {/* 4. Action Button for AI Suggestion Generator */}
+                        <button 
+                          onClick={handleGenerateIdeas}
+                          disabled={!activeChannel || generatingIdeas}
+                          className="w-full bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold py-2.5 rounded-xl transition flex items-center justify-center gap-1.5 shadow disabled:opacity-50 shrink-0"
+                        >
+                          <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                          <span>{generatingIdeas ? "Consulting Gemini AI..." : "Generate Custom Ideas"}</span>
+                        </button>
+
+                        {/* 5. Suggestions Stream */}
+                        <div className="space-y-2 flex-1 flex flex-col min-h-0">
+                          <h3 className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Generated Video Ideas</h3>
+                          
+                          <div className="space-y-3 overflow-y-auto pr-1 flex-1 max-h-[220px]">
+                            {generatingIdeas ? (
+                              <div className="space-y-2.5 py-4">
+                                <div className="h-10 bg-slate-100 rounded-lg animate-pulse"></div>
+                                <div className="h-16 bg-slate-100 rounded-lg animate-pulse"></div>
+                                <p className="text-[10px] text-slate-400 text-center italic">Gemini is synthesizing views-per-hour metrics...</p>
+                              </div>
+                            ) : generatedIdeas.length > 0 ? (
+                              generatedIdeas.map((idea, idx) => (
+                                <div key={idea.id} className="bg-white border border-slate-200/80 p-3 rounded-xl shadow-sm relative group space-y-1.5">
+                                  <span className={`absolute top-2.5 right-2.5 text-[8px] font-bold px-1.5 py-0.5 rounded-full ${idea.suggestedFormat === "shorts" ? "bg-rose-50 text-rose-600 border border-rose-100" : "bg-blue-50 text-blue-600 border border-blue-100"}`}>
+                                    {idea.suggestedFormat === "shorts" ? "Shorts" : "Long Form"}
+                                  </span>
+                                  
+                                  <h5 className="font-semibold text-xs text-slate-800 pr-14 leading-snug">{idea.title}</h5>
+                                  <p className="text-[11px] text-slate-600 leading-relaxed">
+                                    <span className="font-bold text-slate-800">Hook:</span> {idea.hook}
+                                  </p>
+                                  <p className="text-[11px] text-slate-500 line-clamp-1 leading-normal">
+                                    <span className="font-bold text-slate-700">Audience:</span> {idea.targetAudience}
+                                  </p>
+
+                                  {/* Quick save button */}
+                                  <div className="flex justify-between items-center pt-2 border-t border-slate-100 mt-2">
+                                    <span className="text-[9px] text-indigo-500 font-medium">Derived from trends</span>
+                                    <button 
+                                      onClick={() => saveIdea(idea)}
+                                      className="text-[10px] text-slate-500 hover:text-indigo-600 font-medium flex items-center gap-0.5 transition"
+                                    >
+                                      <Bookmark className="w-3 h-3" />
+                                      Save Concept
+                                    </button>
                                   </div>
                                 </div>
-                              );
-                            })}
+                              ))
+                            ) : (
+                              <div className="text-center py-6 text-slate-400 text-xs border border-dashed border-slate-100 rounded-xl">
+                                Click "Generate Custom Ideas" above to load suggestions.
+                              </div>
+                            )}
                           </div>
-                        )}
+                        </div>
                       </div>
                     )}
-
-                    {/* 4. Action Button for AI Suggestion Generator */}
-                    <button 
-                      onClick={handleGenerateIdeas}
-                      disabled={!activeChannel || generatingIdeas}
-                      className="w-full bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold py-2.5 rounded-xl transition flex items-center justify-center gap-1.5 shadow disabled:opacity-50"
-                    >
-                      <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-                      <span>{generatingIdeas ? "Consulting Gemini AI..." : "Generate Custom Ideas"}</span>
-                    </button>
-
-                    {/* 5. Suggestions Stream */}
-                    <div className="space-y-3 pt-2">
-                      <h3 className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Generated Video Ideas</h3>
-                      
-                      <div className="space-y-3">
-                        {generatingIdeas ? (
-                          <div className="space-y-2.5 py-4">
-                            <div className="h-10 bg-slate-100 rounded-lg animate-pulse"></div>
-                            <div className="h-16 bg-slate-100 rounded-lg animate-pulse"></div>
-                            <p className="text-[10px] text-slate-400 text-center italic">Gemini is synthesizing views-per-hour metrics...</p>
-                          </div>
-                        ) : generatedIdeas.length > 0 ? (
-                          generatedIdeas.map((idea, idx) => (
-                            <div key={idea.id} className="bg-white border border-slate-200/80 p-3 rounded-xl shadow-sm relative group space-y-1.5">
-                              <span className={`absolute top-2.5 right-2.5 text-[8px] font-bold px-1.5 py-0.5 rounded-full ${idea.suggestedFormat === "shorts" ? "bg-rose-50 text-rose-600 border border-rose-100" : "bg-blue-50 text-blue-600 border border-blue-100"}`}>
-                                {idea.suggestedFormat === "shorts" ? "Shorts" : "Long Form"}
-                              </span>
-                              
-                              <h5 className="font-semibold text-xs text-slate-800 pr-14 leading-snug">{idea.title}</h5>
-                              <p className="text-[11px] text-slate-600 leading-relaxed">
-                                <span className="font-bold text-slate-800">Hook:</span> {idea.hook}
-                              </p>
-                              <p className="text-[11px] text-slate-500 line-clamp-1 leading-normal">
-                                <span className="font-bold text-slate-700">Audience:</span> {idea.targetAudience}
-                              </p>
-
-                              {/* Quick save button */}
-                              <div className="flex justify-between items-center pt-2 border-t border-slate-100 mt-2">
-                                <span className="text-[9px] text-indigo-500 font-medium">Derived from current category trends</span>
-                                <button 
-                                  onClick={() => saveIdea(idea)}
-                                  className="text-[10px] text-slate-500 hover:text-indigo-600 font-medium flex items-center gap-0.5 transition"
-                                >
-                                  <Bookmark className="w-3 h-3" />
-                                  Save Concept
-                                </button>
-                              </div>
-                            </div>
-                          ))
-                        ) : (
-                          <div className="text-center py-6 text-slate-400 text-xs border border-dashed border-slate-100 rounded-xl">
-                            Click "Generate Custom Ideas" above to load suggestions.
-                          </div>
-                        )}
-                      </div>
-                    </div>
                   </>
                 )}
 

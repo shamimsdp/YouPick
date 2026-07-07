@@ -23,7 +23,7 @@ app.use((req, res, next) => {
   next();
 });
 
-const PORT = 3000;
+const PORT = Number(process.env.PORT) || 5000;
 
 // Initialize Gemini API
 const ai = new GoogleGenAI({
@@ -752,7 +752,8 @@ app.get("/api/extension/download", async (req, res) => {
 
       <!-- 2. Main Dashboard View -->
       <div id="dashboardView" class="dashboard-view">
-        <div class="left-col">
+        <!-- Always visible top section -->
+        <div class="channel-section-container">
           <div class="channel-section">
             <input type="text" id="inputChannel" placeholder="Channel Handle (e.g. @Veritasium)" />
             <button id="btnAnalyze">Analyze</button>
@@ -767,37 +768,58 @@ app.get("/api/extension/download", async (req, res) => {
               <img id="channelAvatar" class="avatar" src="" alt="Avatar" />
               <div>
                 <h3 id="channelTitle">Channel</h3>
-                <span id="channelNiche" class="niche-tag">Niche</span>
+                <select id="channelNiche" class="niche-select">
+                  <option value="tech">Tech</option>
+                  <option value="gaming">Gaming</option>
+                  <option value="finance">Finance</option>
+                  <option value="cooking">Cooking</option>
+                  <option value="lifestyle">Lifestyle</option>
+                  <option value="travel">Travel</option>
+                  <option value="kids">Kids</option>
+                </select>
               </div>
             </div>
             <p id="channelDesc" class="channel-desc"></p>
           </div>
-
-          <div class="toggle-section">
-            <span class="section-label">Trend Window:</span>
-            <div class="toggle-group">
-              <button id="btn24h" class="toggle-btn active">24 Hours</button>
-              <button id="btn7d" class="toggle-btn">7 Days</button>
-            </div>
-          </div>
         </div>
 
-        <div class="right-col">
-          <div id="trendsContainer" class="trends-section hidden">
-            <h3 class="section-title">Trending in Category</h3>
-            <div id="trendsList" class="trends-list">
-              <!-- Dynamic trends will load here -->
+        <!-- Tabs Navigation -->
+        <div class="tabs-nav">
+          <button id="tabTrends" class="tab-btn active">Trend Window</button>
+          <button id="tabIdeas" class="tab-btn">Gemini Ideas</button>
+        </div>
+
+        <!-- Tab Contents -->
+        <div class="tabs-content">
+          <!-- Tab 1: Trend Window Content -->
+          <div id="contentTrends" class="tab-panel active">
+            <div class="toggle-section" style="margin-top: 8px;">
+              <span class="section-label">Trend Window:</span>
+              <div class="toggle-group">
+                <button id="btn24h" class="toggle-btn active">24 Hours</button>
+                <button id="btn7d" class="toggle-btn">7 Days</button>
+              </div>
+            </div>
+
+            <div id="trendsContainer" class="trends-section hidden" style="margin-top: 16px;">
+              <h3 class="section-title">Trending in Category</h3>
+              <div id="trendsList" class="trends-list">
+                <!-- Dynamic trends will load here -->
+              </div>
             </div>
           </div>
 
-          <div class="ideas-section">
-            <div class="section-header">
-              <h2>Gemini Ideas</h2>
-              <button id="btnGenerate" class="btn-primary" disabled>Generate Ideas</button>
-            </div>
-            <div id="ideasContainer" class="ideas-list">
-              <div class="empty-state">
-                <p>Connect a YouTube channel to trigger YouPick growth suggestions.</p>
+          <!-- Tab 2: Gemini Ideas Content -->
+          <div id="contentIdeas" class="tab-panel">
+            <div class="ideas-section" style="border-top: none; padding-top: 8px;">
+              <div class="section-header">
+                <h2>Gemini Ideas</h2>
+                <button id="btnGenerate" class="btn-primary" disabled>Generate Ideas</button>
+              </div>
+              <div id="ideasContainer" class="ideas-list">
+                <div class="empty-state">
+                  <p>Connect a YouTube channel to trigger YouPick growth suggestions.</p>
+                </div>
               </div>
             </div>
           </div>
@@ -887,26 +909,42 @@ app.get("/api/extension/download", async (req, res) => {
   flex: 1;
 }
 
-/* Two-column grid layout for wide separate page */
-@media (min-width: 768px) {
-  .dashboard-view {
-    display: grid !important;
-    grid-template-columns: 5fr 7fr;
-    gap: 24px;
-    align-items: start;
-  }
-  
-  .left-col {
-    display: flex;
-    flex-direction: column;
-    gap: 16px;
-  }
-  
-  .right-col {
-    display: flex;
-    flex-direction: column;
-    gap: 16px;
-  }
+/* Tab Navigation Styles */
+.tabs-nav {
+  display: flex;
+  border-bottom: 1px solid #e2e8f0;
+  margin-bottom: 16px;
+}
+
+.tab-btn {
+  flex: 1;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  padding: 8px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #64748b;
+  cursor: pointer;
+  text-align: center;
+  transition: all 0.2s ease;
+}
+
+.tab-btn:hover {
+  color: #3b82f6;
+}
+
+.tab-btn.active {
+  color: #3b82f6;
+  border-bottom: 2px solid #3b82f6;
+}
+
+.tab-panel {
+  display: none;
+}
+
+.tab-panel.active {
+  display: block;
 }
 
 .channel-section {
@@ -984,7 +1022,7 @@ app.get("/api/extension/download", async (req, res) => {
   object-fit: cover;
 }
 
-.niche-tag {
+.niche-tag, .niche-select {
   background-color: #f1f5f9;
   color: #475569;
   font-size: 10px;
@@ -992,6 +1030,9 @@ app.get("/api/extension/download", async (req, res) => {
   border-radius: 4px;
   font-weight: 600;
   text-transform: uppercase;
+  border: none;
+  cursor: pointer;
+  outline: none;
 }
 
 .channel-desc {
@@ -1785,6 +1826,40 @@ function initUI() {
       loadNicheTrends();
     }
   });
+
+  const tabTrends = document.getElementById("tabTrends");
+  const tabIdeas = document.getElementById("tabIdeas");
+  const contentTrends = document.getElementById("contentTrends");
+  const contentIdeas = document.getElementById("contentIdeas");
+
+  if (tabTrends && tabIdeas && contentTrends && contentIdeas) {
+    tabTrends.addEventListener("click", () => {
+      tabTrends.classList.add("active");
+      tabIdeas.classList.remove("active");
+      contentTrends.classList.add("active");
+      contentIdeas.classList.remove("active");
+    });
+
+    tabIdeas.addEventListener("click", () => {
+      tabIdeas.classList.add("active");
+      tabTrends.classList.remove("active");
+      contentIdeas.classList.add("active");
+      contentTrends.classList.remove("active");
+    });
+  }
+
+  const channelNicheSelect = document.getElementById("channelNiche");
+  if (channelNicheSelect) {
+    channelNicheSelect.addEventListener("change", (e) => {
+      const selectedVal = e.target.value;
+      if (activeChannel) {
+        activeChannel.category = selectedVal;
+        chrome.storage.local.set({ activeChannel: activeChannel }, () => {
+          loadNicheTrends();
+        });
+      }
+    });
+  }
 }
 
 async function loadNicheTrends() {
@@ -1809,7 +1884,7 @@ async function loadNicheTrends() {
     // Fall back to proxy API if direct query has no API key or direct query returned empty list
     if (trends.length === 0) {
       try {
-        let baseUrl = CONFIGS.proxyUrl || "https://ais-dev-sndbpvhezzyi4mp3mkvsvr-676650229984.asia-east1.run.app";
+        let baseUrl = CONFIGS.proxyUrl || "http://localhost:5000";
         const trendsRes = await fetch(baseUrl + "/api/trends", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -2242,7 +2317,7 @@ async function handleAnalyze() {
 
   let url = "";
   try {
-    let baseUrl = CONFIGS.proxyUrl || "https://ais-dev-sndbpvhezzyi4mp3mkvsvr-676650229984.asia-east1.run.app";
+    let baseUrl = CONFIGS.proxyUrl || "http://localhost:5000";
     url = baseUrl + "/api/channel/resolve";
     const res = await fetch(url, {
       method: "POST",
@@ -2291,7 +2366,7 @@ async function handleGenerate() {
   }
 
   try {
-    let baseUrl = CONFIGS.proxyUrl || "https://ais-dev-sndbpvhezzyi4mp3mkvsvr-676650229984.asia-east1.run.app";
+    let baseUrl = CONFIGS.proxyUrl || "http://localhost:5000";
     
     // 1. Fetch Niche Trends
     let trends = [];
@@ -2380,7 +2455,7 @@ async function handleGenerate() {
 function renderChannelBadge(channel) {
   const badge = document.getElementById("channelBadge");
   document.getElementById("channelTitle").innerText = channel.title;
-  document.getElementById("channelNiche").innerText = channel.category;
+  document.getElementById("channelNiche").value = (channel.category || "tech").toLowerCase();
   document.getElementById("channelDesc").innerText = channel.description;
   document.getElementById("channelAvatar").src = channel.thumbnail;
   badge.classList.remove("hidden");
