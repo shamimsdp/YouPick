@@ -32,11 +32,8 @@ export default function App() {
   const [channelQuery, setChannelQuery] = useState("");
   const [activeChannel, setActiveChannel] = useState<ChannelInfo | null>(null);
   const [trendWindow, setTrendWindow] = useState<"24h" | "7d">("24h");
-  const [selectedNiche, setSelectedNiche] = useState("kids");
-  const [selectedCategoryFilter, setSelectedCategoryFilter] = useState<string | null>(null);
-  // All available categories collected across trend data
-  const ALL_CATEGORIES = ["tech", "gaming", "finance", "cooking", "lifestyle", "travel", "kids"] as const;
-
+  const [selectedNiche, setSelectedNiche] = useState("tech");
+  
   // Data States
   const [nicheTrends, setNicheTrends] = useState<VideoTrend[]>([]);
   const [generatedIdeas, setGeneratedIdeas] = useState<VideoIdea[]>([]);
@@ -110,7 +107,6 @@ export default function App() {
     // Fetch initial trends based on restored values
     fetchTrends(savedNiche, savedWindow);
   }, []);
-
 
   const fetchTrends = async (category: string, windowVal: "24h" | "7d") => {
     setLoadingTrends(true);
@@ -188,7 +184,6 @@ export default function App() {
         localStorage.setItem("yt_active_channel", JSON.stringify(data));
         // Automatically sync niche list to channel's category
         setSelectedNiche(data.category);
-        setSelectedCategoryFilter(data.category);
         localStorage.setItem("yt_selected_niche", data.category);
         fetchTrends(data.category, trendWindow);
       }
@@ -685,47 +680,49 @@ async function handleGenerate() {
                       </div>
                     </div>
 
-                    {/* Simulator Niche Trends List - always shows trends */}
-                    <div className="border-t border-slate-100 pt-3 space-y-2">
-                      <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">
-                        Niche Trends <span className="capitalize text-indigo-500">({activeChannel ? activeChannel.category : selectedNiche})</span>
-                      </span>
-                      {loadingTrends ? (
-                        <div className="text-center py-4 text-xs text-slate-400">Loading trends...</div>
-                      ) : nicheTrends.length === 0 ? (
-                        <div className="text-center py-4 text-xs text-slate-400">No trends found.</div>
-                      ) : (
-                        <div className="space-y-1.5 max-h-[200px] overflow-y-auto pr-1">
-                          {nicheTrends.map((trend: any) => {
-                            const viewStr = Number(trend.viewCount || 0).toLocaleString();
-                            const vphStr = trend.viewsPerHour ? `${trend.viewsPerHour}/hr` : "";
-                            return (
-                              <div key={trend.id || trend.title} className="flex gap-2 items-center bg-slate-50 hover:bg-slate-100 border border-slate-100 rounded-lg p-1.5 transition">
-                                <img 
-                                  className="w-12 h-8 rounded object-cover bg-slate-200 flex-shrink-0" 
-                                  src={trend.thumbnail || "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe"} 
-                                  alt="Thumb" 
-                                  referrerPolicy="no-referrer"
-                                />
-                                <div className="min-width-0 flex-1 overflow-hidden">
-                                  <h4 className="text-[11px] font-medium text-slate-800 truncate">
-                                    <a href={trend.url} target="_blank" rel="noopener noreferrer" className="hover:text-blue-600 hover:underline">
-                                      {trend.title}
-                                    </a>
-                                  </h4>
-                                  <div className="flex justify-between text-[9px] text-slate-500 mt-0.5">
-                                    <span className="truncate max-w-[100px]">{trend.channelTitle}</span>
-                                    <span>
-                                      {viewStr} views {vphStr && <span className="text-emerald-500 font-semibold ml-1">{vphStr}</span>}
-                                    </span>
+                    {/* Simulator Niche Trends List */}
+                    {activeChannel && (
+                      <div className="border-t border-slate-100 pt-3 space-y-2">
+                        <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">
+                          Niche Trends ({activeChannel.category})
+                        </span>
+                        {loadingTrends ? (
+                          <div className="text-center py-4 text-xs text-slate-400">Loading trends...</div>
+                        ) : nicheTrends.length === 0 ? (
+                          <div className="text-center py-4 text-xs text-slate-400">No trends found.</div>
+                        ) : (
+                          <div className="space-y-1.5 max-h-[160px] overflow-y-auto pr-1">
+                            {nicheTrends.map((trend: any) => {
+                              const viewStr = Number(trend.viewCount || 0).toLocaleString();
+                              const vphStr = trend.viewsPerHour ? `${trend.viewsPerHour}/hr` : "";
+                              return (
+                                <div key={trend.id || trend.title} className="flex gap-2 items-center bg-slate-50 hover:bg-slate-100 border border-slate-100 rounded-lg p-1.5 transition">
+                                  <img 
+                                    className="w-12 h-8 rounded object-cover bg-slate-200 flex-shrink-0" 
+                                    src={trend.thumbnail || "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe"} 
+                                    alt="Thumb" 
+                                    referrerPolicy="no-referrer"
+                                  />
+                                  <div className="min-width-0 flex-1 overflow-hidden">
+                                    <h4 className="text-[11px] font-medium text-slate-800 truncate">
+                                      <a href={trend.url} target="_blank" rel="noopener noreferrer" className="hover:text-blue-600 hover:underline">
+                                        {trend.title}
+                                      </a>
+                                    </h4>
+                                    <div className="flex justify-between text-[9px] text-slate-500 mt-0.5">
+                                      <span className="truncate max-w-[100px]">{trend.channelTitle}</span>
+                                      <span>
+                                        {viewStr} views {vphStr && <span className="text-emerald-500 font-semibold ml-1">{vphStr}</span>}
+                                      </span>
+                                    </div>
                                   </div>
                                 </div>
-                              </div>
-                            );
+                              );
                             })}
                           </div>
                         )}
                       </div>
+                    )}
 
                     {/* 4. Action Button for AI Suggestion Generator */}
                     <button 
@@ -842,127 +839,56 @@ async function handleGenerate() {
               </div>
             </div>
 
-            {/* Category Chips - All collected categories */}
-            <div className="px-4 pt-3 pb-1 bg-white border-b border-slate-200/50">
-              <div className="flex items-center gap-2 mb-2">
-                <TrendingUp className="w-3.5 h-3.5 text-indigo-500" />
-                <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Trending Categories</span>
-                <span className="text-[10px] text-slate-400 ml-1">(click to filter)</span>
-              </div>
-              <div className="flex flex-wrap gap-1.5 pb-2">
-                <button
-                  onClick={() => setSelectedCategoryFilter(null)}
-                  className={`px-3 py-1 text-xs rounded-full font-medium transition capitalize border ${
-                    selectedCategoryFilter === null
-                      ? "bg-indigo-600 text-white border-indigo-600 shadow-sm"
-                      : "bg-slate-50 hover:bg-slate-100 text-slate-600 border-slate-200"
-                  }`}
-                >
-                  All
-                </button>
-                {ALL_CATEGORIES.map((cat) => (
-                  <button
-                    key={cat}
-                    onClick={() => {
-                      setSelectedCategoryFilter(cat);
-                      if (cat !== selectedNiche) {
-                        handleNicheChange(cat);
-                      }
-                    }}
-                    className={`px-3 py-1 text-xs rounded-full font-medium transition capitalize border ${
-                      selectedCategoryFilter === cat
-                        ? "bg-indigo-600 text-white border-indigo-600 shadow-sm"
-                        : activeChannel && activeChannel.category === cat
-                        ? "bg-violet-50 text-violet-700 border-violet-300 ring-1 ring-violet-300"
-                        : "bg-slate-50 hover:bg-slate-100 text-slate-600 border-slate-200"
-                    }`}
-                  >
-                    {cat}
-                    {activeChannel && activeChannel.category === cat && (
-                      <span className="ml-1 text-[9px] bg-violet-200 text-violet-700 px-1 rounded-full">your niche</span>
-                    )}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Quick Niches Toggle Buttons (kept for direct category switching) */}
-            <div className="px-4 py-2 bg-slate-50/20 border-b border-slate-200/50 flex flex-wrap gap-1.5 items-center">
-              <span className="text-[10px] text-slate-400 font-medium mr-1">Quick switch:</span>
+            {/* Quick Niches Toggle Buttons */}
+            <div className="px-4 py-2.5 bg-slate-50/20 border-b border-slate-200/50 flex flex-wrap gap-1.5">
               {["tech", "gaming", "finance", "cooking", "lifestyle", "travel", "kids"].map((niche) => (
                 <button
                   key={niche}
-                  onClick={() => { handleNicheChange(niche); setSelectedCategoryFilter(niche); }}
-                  className={`px-2.5 py-0.5 text-[10px] rounded-full font-medium transition capitalize ${
-                    selectedNiche === niche ? "bg-slate-900 text-white" : "bg-slate-100 hover:bg-slate-200 text-slate-600"
-                  }`}
+                  onClick={() => handleNicheChange(niche)}
+                  className={`px-3 py-1 text-xs rounded-full font-medium transition capitalize ${selectedNiche === niche ? "bg-slate-900 text-white" : "bg-slate-100 hover:bg-slate-200 text-slate-600"}`}
                 >
                   {niche}
                 </button>
               ))}
             </div>
 
-            {/* Videos Trend List Grid - always shows trends for selected category */}
+            {/* Videos Trend List Grid */}
             <div className="p-4">
               {loadingTrends ? (
                 <div className="space-y-3 py-6">
                   <div className="h-12 bg-slate-50 rounded-xl animate-pulse"></div>
                   <div className="h-12 bg-slate-50 rounded-xl animate-pulse"></div>
                   <div className="h-12 bg-slate-50 rounded-xl animate-pulse"></div>
-                  <div className="h-12 bg-slate-50 rounded-xl animate-pulse"></div>
-                  <div className="h-12 bg-slate-50 rounded-xl animate-pulse"></div>
                 </div>
               ) : nicheTrends.length > 0 ? (
-                <div className="space-y-1">
-                  <div className="flex items-center justify-between mb-3">
-                    <span className="text-xs font-semibold text-slate-500">
-                      Trending in <span className="text-indigo-600 capitalize">{selectedCategoryFilter || selectedNiche}</span>
-                      <span className="ml-2 text-[10px] bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full">{nicheTrends.length} videos</span>
-                    </span>
-                    <div className="bg-slate-100 p-0.5 rounded-lg flex">
-                      <button 
-                        onClick={() => handleWindowChange("24h")}
-                        className={`text-[10px] font-medium px-2.5 py-1 rounded-md transition ${trendWindow === "24h" ? "bg-white text-slate-800 shadow-sm" : "text-slate-500 hover:text-slate-800"}`}
-                      >
-                        24 Hours
-                      </button>
-                      <button 
-                        onClick={() => handleWindowChange("7d")}
-                        className={`text-[10px] font-medium px-2.5 py-1 rounded-md transition ${trendWindow === "7d" ? "bg-white text-slate-800 shadow-sm" : "text-slate-500 hover:text-slate-800"}`}
-                      >
-                        7 Days
-                      </button>
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    {nicheTrends.map((trend) => (
-                      <div key={trend.id} className="flex bg-slate-50 border border-slate-150 p-2.5 rounded-xl gap-3 hover:border-slate-300 transition group relative">
-                        <div className="w-24 h-16 rounded-lg overflow-hidden shrink-0 relative bg-slate-200">
-                          <img 
-                            src={trend.thumbnail} 
-                            alt="Thumbnail" 
-                            className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
-                          />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {nicheTrends.map((trend) => (
+                    <div key={trend.id} className="flex bg-slate-50 border border-slate-150 p-2.5 rounded-xl gap-3 hover:border-slate-300 transition group relative">
+                      <div className="w-24 h-16 rounded-lg overflow-hidden shrink-0 relative bg-slate-200">
+                        <img 
+                          src={trend.thumbnail} 
+                          alt="Thumbnail" 
+                          className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
+                        />
+                      </div>
+                      
+                      <div className="min-w-0 flex-1 flex flex-col justify-between">
+                        <div>
+                          <h4 className="font-semibold text-xs text-slate-800 line-clamp-2 leading-snug group-hover:text-indigo-600 transition">
+                            <a href={trend.url} target="_blank" rel="noopener noreferrer" className="hover:underline">
+                              {trend.title}
+                            </a>
+                          </h4>
+                          <span className="text-[10px] text-slate-500 block truncate mt-0.5">{trend.channelTitle}</span>
                         </div>
                         
-                        <div className="min-w-0 flex-1 flex flex-col justify-between">
-                          <div>
-                            <h4 className="font-semibold text-xs text-slate-800 line-clamp-2 leading-snug group-hover:text-indigo-600 transition">
-                              <a href={trend.url} target="_blank" rel="noopener noreferrer" className="hover:underline">
-                                {trend.title}
-                              </a>
-                            </h4>
-                            <span className="text-[10px] text-slate-500 block truncate mt-0.5">{trend.channelTitle}</span>
-                          </div>
-                          
-                          <div className="flex items-center justify-between text-[9px] text-slate-400 mt-1 font-mono">
-                            <span>{Number(trend.viewCount).toLocaleString()} views</span>
-                            <span className="text-emerald-600 font-semibold">{trend.viewsPerHour}/hr</span>
-                          </div>
+                        <div className="flex items-center justify-between text-[9px] text-slate-400 mt-1 font-mono">
+                          <span>{Number(trend.viewCount).toLocaleString()} views</span>
+                          <span className="text-emerald-600 font-semibold">{trend.viewsPerHour}/hr</span>
                         </div>
                       </div>
-                    ))}
-                  </div>
+                    </div>
+                  ))}
                 </div>
               ) : (
                 <div className="text-center py-12 text-slate-400 text-xs">
@@ -972,7 +898,6 @@ async function handleGenerate() {
             </div>
 
           </div>
-
 
           {/* Dashboard Module 2: Saved Content Concepts Library */}
           <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 space-y-4">
