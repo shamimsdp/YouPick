@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { STATIC_TRENDS } from "./staticTrends";
 import { 
   Sparkles, 
   Chrome, 
@@ -63,7 +64,7 @@ export default function App() {
   const [simRegion, setSimRegion] = useState("US");
   const [simProxyUrl, setSimProxyUrl] = useState(window.location.origin);
 
-  // Load saved ideas from local storage
+  // Load saved simulator states & ideas from local storage
   useEffect(() => {
     const saved = localStorage.getItem("yt_ideas_saved");
     if (saved) {
@@ -73,12 +74,43 @@ export default function App() {
         console.error(e);
       }
     }
-    // Fetch initial trends
-    fetchTrends("tech", "24h");
+
+    // Restore simulator active channel
+    const savedChannel = localStorage.getItem("yt_active_channel");
+    if (savedChannel) {
+      try {
+        const parsed = JSON.parse(savedChannel);
+        setActiveChannel(parsed);
+        setChannelQuery(parsed.customUrl || parsed.title || "");
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    // Restore simulator generated ideas
+    const savedGenIdeas = localStorage.getItem("yt_generated_ideas");
+    if (savedGenIdeas) {
+      try {
+        setGeneratedIdeas(JSON.parse(savedGenIdeas));
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    // Restore simulator selected niche & trend window
+    const savedNiche = localStorage.getItem("yt_selected_niche") || "tech";
+    const savedWindow = (localStorage.getItem("yt_trend_window") as "24h" | "7d") || "24h";
+    
+    setSelectedNiche(savedNiche);
+    setTrendWindow(savedWindow);
+
+    // Fetch initial trends based on restored values
+    fetchTrends(savedNiche, savedWindow);
   }, []);
 
   const fetchTrends = async (category: string, windowVal: "24h" | "7d") => {
     setLoadingTrends(true);
+    let success = false;
     try {
       const res = await fetch("/api/trends", {
         method: "POST",
@@ -90,15 +122,44 @@ export default function App() {
           youtubeApiKey: configs.youtubeApiKey
         })
       });
-      const data = await res.json();
-      if (data.trends) {
-        setNicheTrends(data.trends);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.trends && data.trends.length > 0) {
+          setNicheTrends(data.trends);
+          success = true;
+        }
       }
     } catch (err) {
-      console.error(err);
-    } finally {
-      setLoadingTrends(false);
+      console.warn("API trends fetch failed, falling back to static client-side trends:", err);
     }
+
+    if (!success) {
+      // Fallback to static client trends
+      const finalCategory = (category || "tech").toLowerCase().trim();
+      const localData = STATIC_TRENDS[finalCategory] || STATIC_TRENDS["tech"];
+      const fallbackTrends = localData.map((v, idx) => {
+        const publishedAtDate = new Date();
+        publishedAtDate.setHours(publishedAtDate.getHours() - (idx * 4 + 2));
+        const publishedAt = publishedAtDate.toISOString();
+        const hoursSincePublished = Math.max(1, (Date.now() - publishedAtDate.getTime()) / (1000 * 60 * 60));
+        const factor = windowVal === "24h" ? 0.4 : 1.2;
+        const viewCount = Math.round(v.viewCount * factor);
+        const viewsPerHour = Math.round(viewCount / hoursSincePublished);
+
+        return {
+          id: "local_trend_" + finalCategory + "_" + idx,
+          title: v.title,
+          url: "https://youtube.com/watch?v=dQw4w9WgXcQ",
+          thumbnail: v.thumbnail,
+          viewCount,
+          publishedAt,
+          viewsPerHour,
+          channelTitle: v.channelTitle,
+        };
+      });
+      setNicheTrends(fallbackTrends);
+    }
+    setLoadingTrends(false);
   };
 
   const handleResolveChannel = async (queryStr: string) => {
@@ -120,8 +181,10 @@ export default function App() {
         setErrorText(data.error);
       } else {
         setActiveChannel(data);
+        localStorage.setItem("yt_active_channel", JSON.stringify(data));
         // Automatically sync niche list to channel's category
         setSelectedNiche(data.category);
+        localStorage.setItem("yt_selected_niche", data.category);
         fetchTrends(data.category, trendWindow);
       }
     } catch (err) {
@@ -152,6 +215,7 @@ export default function App() {
         setErrorText(data.error);
       } else if (data.ideas) {
         setGeneratedIdeas(data.ideas);
+        localStorage.setItem("yt_generated_ideas", JSON.stringify(data.ideas));
       }
     } catch (err) {
       setErrorText("Failed to generate custom ideas via Gemini. Please try again.");
@@ -193,11 +257,13 @@ export default function App() {
   // Niche Tab change handler
   const handleNicheChange = (niche: string) => {
     setSelectedNiche(niche);
+    localStorage.setItem("yt_selected_niche", niche);
     fetchTrends(niche, trendWindow);
   };
 
   const handleWindowChange = (win: "24h" | "7d") => {
     setTrendWindow(win);
+    localStorage.setItem("yt_trend_window", win);
     fetchTrends(selectedNiche, win);
   };
 
@@ -595,7 +661,7 @@ async function handleGenerate() {
                       )}
                     </AnimatePresence>
 
-                    {/* 3. Trend Configuration Window Controls */}
+                     {/* 3. Trend Configuration Window Controls */}
                     <div className="flex items-center justify-between border-t border-slate-100 pt-3">
                       <span className="text-[11px] font-medium text-slate-600">Lookback Performance:</span>
                       <div className="bg-slate-100 p-0.5 rounded-lg flex">
@@ -613,6 +679,50 @@ async function handleGenerate() {
                         </button>
                       </div>
                     </div>
+
+                    {/* Simulator Niche Trends List */}
+                    {activeChannel && (
+                      <div className="border-t border-slate-100 pt-3 space-y-2">
+                        <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">
+                          Niche Trends ({activeChannel.category})
+                        </span>
+                        {loadingTrends ? (
+                          <div className="text-center py-4 text-xs text-slate-400">Loading trends...</div>
+                        ) : nicheTrends.length === 0 ? (
+                          <div className="text-center py-4 text-xs text-slate-400">No trends found.</div>
+                        ) : (
+                          <div className="space-y-1.5 max-h-[160px] overflow-y-auto pr-1">
+                            {nicheTrends.map((trend: any) => {
+                              const viewStr = Number(trend.viewCount || 0).toLocaleString();
+                              const vphStr = trend.viewsPerHour ? `${trend.viewsPerHour}/hr` : "";
+                              return (
+                                <div key={trend.id || trend.title} className="flex gap-2 items-center bg-slate-50 hover:bg-slate-100 border border-slate-100 rounded-lg p-1.5 transition">
+                                  <img 
+                                    className="w-12 h-8 rounded object-cover bg-slate-200 flex-shrink-0" 
+                                    src={trend.thumbnail || "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe"} 
+                                    alt="Thumb" 
+                                    referrerPolicy="no-referrer"
+                                  />
+                                  <div className="min-width-0 flex-1 overflow-hidden">
+                                    <h4 className="text-[11px] font-medium text-slate-800 truncate">
+                                      <a href={trend.url} target="_blank" rel="noopener noreferrer" className="hover:text-blue-600 hover:underline">
+                                        {trend.title}
+                                      </a>
+                                    </h4>
+                                    <div className="flex justify-between text-[9px] text-slate-500 mt-0.5">
+                                      <span className="truncate max-w-[100px]">{trend.channelTitle}</span>
+                                      <span>
+                                        {viewStr} views {vphStr && <span className="text-emerald-500 font-semibold ml-1">{vphStr}</span>}
+                                      </span>
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    )}
 
                     {/* 4. Action Button for AI Suggestion Generator */}
                     <button 
@@ -731,7 +841,7 @@ async function handleGenerate() {
 
             {/* Quick Niches Toggle Buttons */}
             <div className="px-4 py-2.5 bg-slate-50/20 border-b border-slate-200/50 flex flex-wrap gap-1.5">
-              {["tech", "gaming", "finance", "cooking", "lifestyle", "travel"].map((niche) => (
+              {["tech", "gaming", "finance", "cooking", "lifestyle", "travel", "kids"].map((niche) => (
                 <button
                   key={niche}
                   onClick={() => handleNicheChange(niche)}
