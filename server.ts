@@ -1274,59 +1274,72 @@ app.get("/api/extension/download", async (req, res) => {
 .trends-list {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  max-height: 180px;
+  gap: 12px;
+  max-height: 380px;
   overflow-y: auto;
+  padding-right: 4px;
 }
 
 .trend-item {
   display: flex;
-  gap: 8px;
+  flex-direction: column;
   background-color: white;
   border: 1px solid #e2e8f0;
-  border-radius: 6px;
-  padding: 6px;
-  align-items: center;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.trend-item:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06);
 }
 
 .trend-item-thumb {
-  width: 48px;
-  height: 32px;
-  border-radius: 4px;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  height: auto;
   object-fit: cover;
   background-color: #cbd5e1;
   flex-shrink: 0;
 }
 
 .trend-item-info {
-  flex: 1;
+  padding: 10px 12px;
   min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 
 .trend-item-title {
-  font-size: 11px;
-  font-weight: 500;
-  color: #1e293b;
+  font-size: 12px;
+  font-weight: 700;
+  color: #0f172a;
   margin: 0;
-  white-space: nowrap;
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
   overflow: hidden;
-  text-overflow: ellipsis;
+  white-space: normal;
 }
 
 .trend-item-title a {
-  color: #1e293b;
+  color: #0f172a;
   text-decoration: none;
 }
 
 .trend-item-title a:hover {
-  color: #2563eb;
-  text-decoration: underline;
+  color: #ef4444;
 }
 
 .trend-item-meta {
   display: flex;
+  align-items: center;
   justify-content: space-between;
-  font-size: 9px;
+  font-size: 10px;
   color: #64748b;
   margin-top: 2px;
 }

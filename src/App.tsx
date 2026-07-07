@@ -725,29 +725,41 @@ async function handleGenerate() {
                             ) : nicheTrends.length === 0 ? (
                               <div className="text-center py-4 text-xs text-slate-400">No trends found.</div>
                             ) : (
-                              <div className="space-y-1.5 overflow-y-auto pr-1 flex-1 max-h-[220px]">
+                              <div className="space-y-3 overflow-y-auto pr-1 flex-1 max-h-[350px]">
                                 {nicheTrends.map((trend: any) => {
                                   const viewStr = Number(trend.viewCount || 0).toLocaleString();
                                   const vphStr = trend.viewsPerHour ? `${trend.viewsPerHour}/hr` : "";
                                   return (
-                                    <div key={trend.id || trend.title} className="flex gap-2 items-center bg-slate-50 hover:bg-slate-100 border border-slate-100 rounded-lg p-1.5 transition">
-                                      <img 
-                                        className="w-12 h-8 rounded object-cover bg-slate-200 flex-shrink-0" 
-                                        src={trend.thumbnail || "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe"} 
-                                        alt="Thumb" 
-                                        referrerPolicy="no-referrer"
-                                      />
-                                      <div className="min-width-0 flex-1 overflow-hidden">
-                                        <h4 className="text-[11px] font-medium text-slate-800 truncate">
-                                          <a href={trend.url} target="_blank" rel="noopener noreferrer" className="hover:text-blue-600 hover:underline">
+                                    <div key={trend.id || trend.title} className="flex flex-col bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm hover:shadow transition group">
+                                      {/* 16:9 Aspect Ratio Thumbnail */}
+                                      <div className="relative w-full aspect-video bg-slate-100 overflow-hidden shrink-0">
+                                        <img 
+                                          className="w-full h-full object-cover transition duration-300 group-hover:scale-105" 
+                                          src={trend.thumbnail || "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe"} 
+                                          alt="Thumbnail" 
+                                          referrerPolicy="no-referrer"
+                                        />
+                                      </div>
+                                      
+                                      {/* Card Info Details */}
+                                      <div className="p-3 flex flex-col gap-1">
+                                        <h4 className="text-[11px] font-bold text-slate-800 line-clamp-2 leading-snug group-hover:text-indigo-600 transition">
+                                          <a href={trend.url} target="_blank" rel="noopener noreferrer" className="hover:underline">
                                             {trend.title}
                                           </a>
                                         </h4>
-                                        <div className="flex justify-between text-[9px] text-slate-500 mt-0.5">
-                                          <span className="truncate max-w-[100px]">{trend.channelTitle}</span>
-                                          <span>
-                                            {viewStr} views {vphStr && <span className="text-emerald-500 font-semibold ml-1">{vphStr}</span>}
-                                          </span>
+                                        
+                                        <div className="flex items-center justify-between text-[10px] text-slate-400 mt-1 font-mono">
+                                          <span className="font-semibold text-slate-500 truncate max-w-[120px]">{trend.channelTitle}</span>
+                                          <div className="flex items-center gap-1">
+                                            <span>{viewStr} views</span>
+                                            {vphStr && (
+                                              <>
+                                                <span>•</span>
+                                                <span className="text-emerald-500 font-semibold">{vphStr}</span>
+                                              </>
+                                            )}
+                                          </div>
                                         </div>
                                       </div>
                                     </div>
