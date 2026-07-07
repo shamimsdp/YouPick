@@ -562,7 +562,6 @@ app.get("/api/extension/download", async (req, res) => {
         "128": "icons/icon128.png"
       },
       action: {
-        default_popup: "popup.html",
         default_icon: {
           "16": "icons/icon16.png",
           "32": "icons/icon32.png",
@@ -595,7 +594,10 @@ app.get("/api/extension/download", async (req, res) => {
         </svg>
         <h1>YouPick</h1>
       </div>
-      <button id="btnOptions" title="Settings">⚙️</button>
+      <div class="header-actions">
+        <button id="btnFullscreen" title="Open Full Desk" style="background:none; border:none; color:white; font-size:14px; cursor:pointer; padding:0; display:flex; align-items:center;">↗️</button>
+        <button id="btnOptions" title="Settings" style="background:none; border:none; color:white; font-size:14px; cursor:pointer; padding:0; display:flex; align-items:center;">⚙️</button>
+      </div>
     </header>
 
     <main class="main-content">
@@ -678,6 +680,13 @@ app.get("/api/extension/download", async (req, res) => {
           </div>
         </div>
 
+        <div id="trendsContainer" class="trends-section hidden">
+          <h3 class="section-title">Trending in Category</h3>
+          <div id="trendsList" class="trends-list">
+            <!-- Dynamic trends will load here -->
+          </div>
+        </div>
+
         <div class="ideas-section">
           <div class="section-header">
             <h2>Gemini Ideas</h2>
@@ -701,11 +710,27 @@ app.get("/api/extension/download", async (req, res) => {
     // 3. popup.css (Tailwind compilation mockup for clean visual look)
     const popupCss = `body {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  width: 380px;
   margin: 0;
   padding: 0;
   background-color: #f8fafc;
   color: #1e293b;
+}
+
+@media (max-width: 450px) {
+  body {
+    width: 380px;
+  }
+}
+
+@media (min-width: 451px) {
+  body {
+    width: auto;
+    max-width: 600px;
+    margin: 0 auto;
+    box-shadow: 0 4px 20px rgba(15, 23, 42, 0.08);
+    background-color: #ffffff;
+    min-height: 100vh;
+  }
 }
 
 .popup-container {
@@ -1053,6 +1078,90 @@ app.get("/api/extension/download", async (req, res) => {
 
 .btn-activate:hover {
   background-color: #4338ca;
+}
+
+/* Trends Section & Compact List Styles */
+.trends-section {
+  background-color: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 10px;
+  margin-bottom: 16px;
+}
+
+.section-title {
+  font-size: 11px;
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #64748b;
+  margin: 0 0 8px 0;
+}
+
+.trends-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 180px;
+  overflow-y: auto;
+}
+
+.trend-item {
+  display: flex;
+  gap: 8px;
+  background-color: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  padding: 6px;
+  align-items: center;
+}
+
+.trend-item-thumb {
+  width: 48px;
+  height: 32px;
+  border-radius: 4px;
+  object-fit: cover;
+  background-color: #cbd5e1;
+  flex-shrink: 0;
+}
+
+.trend-item-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.trend-item-title {
+  font-size: 11px;
+  font-weight: 500;
+  color: #1e293b;
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.trend-item-title a {
+  color: #1e293b;
+  text-decoration: none;
+}
+
+.trend-item-title a:hover {
+  color: #2563eb;
+  text-decoration: underline;
+}
+
+.trend-item-meta {
+  display: flex;
+  justify-content: space-between;
+  font-size: 9px;
+  color: #64748b;
+  margin-top: 2px;
+}
+
+.trend-item-vph {
+  color: #10b981;
+  font-weight: 600;
+  margin-left: 4px;
 }`;
 
     zip.file("popup.css", popupCss);
@@ -1072,15 +1181,32 @@ let trendWindow = "24h";
 
 document.addEventListener("DOMContentLoaded", () => {
   // Check Chrome Storage for overrides and activation status
-  chrome.storage.local.get(["youtubeApiKey", "geminiApiKey", "regionCode", "proxyUrl", "isActivated"], (res) => {
+  chrome.storage.local.get(["youtubeApiKey", "geminiApiKey", "regionCode", "proxyUrl", "isActivated", "activeChannel", "trendWindow", "generatedIdeas"], (res) => {
     if (res.youtubeApiKey) CONFIGS.youtubeApiKey = res.youtubeApiKey;
     if (res.geminiApiKey) CONFIGS.geminiApiKey = res.geminiApiKey;
     if (res.regionCode) CONFIGS.regionCode = res.regionCode;
     if (res.proxyUrl) CONFIGS.proxyUrl = res.proxyUrl;
     
+    if (res.trendWindow) {
+      trendWindow = res.trendWindow;
+    }
+    
     if (res.isActivated) {
       document.getElementById("activationView").classList.add("hidden");
       document.getElementById("dashboardView").classList.remove("hidden");
+      
+      // Load last resolved channel
+      if (res.activeChannel) {
+        activeChannel = res.activeChannel;
+        renderChannelBadge(activeChannel);
+        document.getElementById("btnGenerate").removeAttribute("disabled");
+        loadNicheTrends();
+      }
+      
+      // Load last generated ideas
+      if (res.generatedIdeas) {
+        renderIdeas(res.generatedIdeas);
+      }
     } else {
       document.getElementById("activationView").classList.remove("hidden");
       document.getElementById("dashboardView").classList.add("hidden");
@@ -1094,14 +1220,29 @@ function initUI() {
   const btnAnalyze = document.getElementById("btnAnalyze");
   const btnGenerate = document.getElementById("btnGenerate");
   const btnOptions = document.getElementById("btnOptions");
+  const btnFullscreen = document.getElementById("btnFullscreen");
   const btn24h = document.getElementById("btn24h");
   const btn7d = document.getElementById("btn7d");
   const btnSaveActivation = document.getElementById("btnSaveActivation");
   const btnResetDefault = document.getElementById("btnResetDefault");
 
+  if (trendWindow === "24h") {
+    btn24h.classList.add("active");
+    btn7d.classList.remove("active");
+  } else {
+    btn7d.classList.add("active");
+    btn24h.classList.remove("active");
+  }
+
   if (btnResetDefault) {
     btnResetDefault.addEventListener("click", () => {
       document.getElementById("activateProxy").value = "${proxyUrl}";
+    });
+  }
+
+  if (btnFullscreen) {
+    btnFullscreen.addEventListener("click", () => {
+      chrome.tabs.create({ url: chrome.runtime.getURL("popup.html") });
     });
   }
 
@@ -1135,13 +1276,87 @@ function initUI() {
     trendWindow = "24h";
     btn24h.classList.add("active");
     btn7d.classList.remove("active");
+    chrome.storage.local.set({ trendWindow: "24h" });
+    if (activeChannel) {
+      loadNicheTrends();
+    }
   });
 
   btn7d.addEventListener("click", () => {
     trendWindow = "7d";
     btn7d.classList.add("active");
     btn24h.classList.remove("active");
+    chrome.storage.local.set({ trendWindow: "7d" });
+    if (activeChannel) {
+      loadNicheTrends();
+    }
   });
+}
+
+async function loadNicheTrends() {
+  if (!activeChannel) return;
+  const container = document.getElementById("trendsContainer");
+  const list = document.getElementById("trendsList");
+  if (!container || !list) return;
+
+  list.innerHTML = '<div style="font-size:11px;color:#94a3b8;text-align:center;padding:12px 0;">Loading trends...</div>';
+  container.classList.remove("hidden");
+
+  try {
+    let trends = [];
+    if (CONFIGS.youtubeApiKey && CONFIGS.youtubeApiKey.length > 5) {
+      trends = await localFetchTrends(activeChannel.category, trendWindow, CONFIGS.regionCode, CONFIGS.youtubeApiKey);
+    } else {
+      let baseUrl = CONFIGS.proxyUrl || "https://ais-dev-sndbpvhezzyi4mp3mkvsvr-676650229984.asia-east1.run.app";
+      const trendsRes = await fetch(baseUrl + "/api/trends", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          category: activeChannel.category,
+          window: trendWindow,
+          region: CONFIGS.regionCode
+        })
+      });
+      if (trendsRes.ok) {
+        const data = await trendsRes.json();
+        trends = data.trends || [];
+      }
+    }
+
+    list.innerHTML = "";
+    if (trends.length === 0) {
+      list.innerHTML = '<div style="font-size:11px;color:#94a3b8;text-align:center;padding:12px 0;">No trends found.</div>';
+      return;
+    }
+
+    activeChannel.trends = trends;
+
+    trends.forEach(t => {
+      const item = document.createElement("div");
+      item.className = "trend-item";
+
+      const thumbUrl = t.thumbnail || "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe";
+      const viewStr = Number(t.viewCount || 0).toLocaleString();
+      const vphStr = t.viewsPerHour ? t.viewsPerHour + "/hr" : "";
+
+      item.innerHTML = \`
+        <img class="trend-item-thumb" src="\${thumbUrl}" alt="Thumb" />
+        <div class="trend-item-info">
+          <h4 class="trend-item-title">
+            <a href="\${t.url}" target="_blank" rel="noopener noreferrer">\${t.title}</a>
+          </h4>
+          <div class="trend-item-meta">
+            <span>\${t.channelTitle}</span>
+            <span>\${viewStr} views <span class="trend-item-vph">\${vphStr}</span></span>
+          </div>
+        </div>
+      \`;
+      list.appendChild(item);
+    });
+  } catch (err) {
+    console.error("Failed to load trends:", err);
+    list.innerHTML = '<div style="font-size:11px;color:#ef4444;text-align:center;padding:12px 0;">Failed to load trends.</div>';
+  }
 }
 
 // Local helper for YouTube/Gemini queries to bypass server proxy when keys are provided
@@ -1232,17 +1447,17 @@ async function localResolveChannel(query, apiKey, geminiKey) {
   }
 
   if (geminiKey) {
-    const prompt = "Search the web for details and recent statistics about the YouTube channel or content niche for: \"" + resolvedQuery + "\".\n" +
-      "Determine its name, standard handle, estimated subscriber count, estimated total videos, and its category niche (select strictly from: \"tech\", \"gaming\", \"finance\", \"cooking\", \"lifestyle\", \"travel\").\n" +
-      "Provide a concise summary description. Return raw JSON adhering to this schema:\n" +
-      "{\n" +
-      "  \"title\": \"Official name of the channel\",\n" +
-      "  \"customUrl\": \"Handle starting with @\",\n" +
-      "  \"description\": \"One-paragraph summary describing the channel niche and topics\",\n" +
-      "  \"category\": \"Strictly one of: 'tech', 'gaming', 'finance', 'cooking', 'lifestyle', 'travel'\",\n" +
-      "  \"subscribers\": \"e.g. '1.24M subscribers'\",\n" +
-      "  \"videosCount\": \"e.g. '342 videos'\",\n" +
-      "  \"thumbnail\": \"Valid URL of any profile image or fallback like 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe'\"\n" +
+    const prompt = "Search the web for details and recent statistics about the YouTube channel or content niche for: \\"" + resolvedQuery + "\\".\\n" +
+      "Determine its name, standard handle, estimated subscriber count, estimated total videos, and its category niche (select strictly from: \\"tech\\", \\"gaming\\", \\"finance\\", \\"cooking\\", \\"lifestyle\\", \\"travel\\").\\n" +
+      "Provide a concise summary description. Return raw JSON adhering to this schema:\\n" +
+      "{\\n" +
+      "  \\"title\\": \\"Official name of the channel\\",\\n" +
+      "  \\"customUrl\\": \\"Handle starting with @\\",\\n" +
+      "  \\"description\\": \\"One-paragraph summary describing the channel niche and topics\\",\\n" +
+      "  \\"category\\": \\"Strictly one of: 'tech', 'gaming', 'finance', 'cooking', 'lifestyle', 'travel'\\",\\n" +
+      "  \\"subscribers\\": \\"e.g. '1.24M subscribers'\\",\\n" +
+      "  \\"videosCount\\": \\"e.g. '342 videos'\\",\\n" +
+      "  \\"thumbnail\\": \\"Valid URL of any profile image or fallback like 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe'\\"\\n" +
       "}";
 
     const gemResponse = await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=" + geminiKey, {
@@ -1340,41 +1555,41 @@ async function localGenerateIdeas(channel, trends, category, geminiKey) {
   if (trends.length > 0) {
     for (let idx = 0; idx < trends.length; idx++) {
       const t = trends[idx];
-      trendsPrompt += (idx + 1) + ". Title: \"" + t.title + "\" | Views: " + t.viewCount + " | Channel: \"" + t.channelTitle + "\"\n";
+      trendsPrompt += (idx + 1) + ". Title: \\"" + t.title + "\\" | Views: " + t.viewCount + " | Channel: \\"" + t.channelTitle + "\\"\\n";
     }
   } else {
     trendsPrompt = "No trends available. Use standard niche topics for inspiration.";
   }
 
-  const prompt = "You are \"YouPick AI\", an expert YouTube growth assistant.\n" +
-    "Analyze the following YouTube channel profile, niche, and currently performing trend videos.\n" +
-    "Then generate exactly 4 highly engaging, hyper-targeted video ideas (both standard videos and Shorts) that are predicted to perform extremely well.\n\n" +
-    "CHANNEL PROFILE:\n" +
-    "Name: " + channel.title + "\n" +
-    "Handle: " + channel.customUrl + "\n" +
-    "Niche/Category: " + category + "\n" +
-    "Description: " + channel.description + "\n" +
-    "Subscribers: " + channel.subscribers + "\n" +
-    "Total Videos: " + channel.videosCount + "\n\n" +
-    "CURRENT IN-NICHE VIDEO TRENDS (Use as inspiration or contextual cues):\n" +
-    trendsPrompt + "\n\n" +
-    "For each of the 4 ideas, provide:\n" +
-    "1. Title (high-CTR click-worthy title)\n" +
-    "2. Hook (opening 5-second hook script/concept)\n" +
-    "3. Rationale (why this idea will trend, linking back to the channel profile or current trends)\n" +
-    "4. Target Audience (who is this for)\n" +
-    "5. Suggested Format (strictly select either: \"Standard Video\" or \"YouTube Short\")\n\n" +
-    "You must respond with raw JSON in this format:\n" +
-    "{\n" +
-    "  \"ideas\": [\n" +
-    "    {\n" +
-    "      \"title\": \"Title here\",\n" +
-    "      \"hook\": \"Hook concept here\",\n" +
-    "      \"rationale\": \"Rationale here\",\n" +
-    "      \"targetAudience\": \"Target audience details\",\n" +
-    "      \"suggestedFormat\": \"Standard Video\"\n" +
-    "    }\n" +
-    "  ]\n" +
+  const prompt = "You are \\"YouPick AI\\", an expert YouTube growth assistant.\\n" +
+    "Analyze the following YouTube channel profile, niche, and currently performing trend videos.\\n" +
+    "Then generate exactly 4 highly engaging, hyper-targeted video ideas (both standard videos and Shorts) that are predicted to perform extremely well.\\n\\n" +
+    "CHANNEL PROFILE:\\n" +
+    "Name: " + channel.title + "\\n" +
+    "Handle: " + channel.customUrl + "\\n" +
+    "Niche/Category: " + category + "\\n" +
+    "Description: " + channel.description + "\\n" +
+    "Subscribers: " + channel.subscribers + "\\n" +
+    "Total Videos: " + channel.videosCount + "\\n\\n" +
+    "CURRENT IN-NICHE VIDEO TRENDS (Use as inspiration or contextual cues):\\n" +
+    trendsPrompt + "\\n\\n" +
+    "For each of the 4 ideas, provide:\\n" +
+    "1. Title (high-CTR click-worthy title)\\n" +
+    "2. Hook (opening 5-second hook script/concept)\\n" +
+    "3. Rationale (why this idea will trend, linking back to the channel profile or current trends)\\n" +
+    "4. Target Audience (who is this for)\\n" +
+    "5. Suggested Format (strictly select either: \\"Standard Video\\" or \\"YouTube Short\\")\\n\\n" +
+    "You must respond with raw JSON in this format:\\n" +
+    "{\\n" +
+    "  \\"ideas\\": [\\n" +
+    "    {\\n" +
+    "      \\"title\\": \\"Title here\\",\\n" +
+    "      \\"hook\\": \\"Hook concept here\\",\\n" +
+    "      \\"rationale\\": \\"Rationale here\\",\\n" +
+    "      \\"targetAudience\\": \\"Target audience details\\",\\n" +
+    "      \\"suggestedFormat\\": \\"Standard Video\\"\\n" +
+    "    }\\n" +
+    "  ]\\n" +
     "}";
 
   const res = await fetch("https://generativelanguage.googleapis.com/v1beta/models/" + modelName + ":generateContent?key=" + geminiKey, {
@@ -1522,6 +1737,9 @@ function renderChannelBadge(channel) {
   document.getElementById("channelDesc").innerText = channel.description;
   document.getElementById("channelAvatar").src = channel.thumbnail;
   badge.classList.remove("hidden");
+
+  chrome.storage.local.set({ activeChannel: channel });
+  loadNicheTrends();
 }
 
 function renderIdeas(ideas) {
@@ -1545,6 +1763,8 @@ function renderIdeas(ideas) {
     \`;
     container.appendChild(card);
   });
+
+  chrome.storage.local.set({ generatedIdeas: ideas });
 }
 
 function showStatus(text) {
@@ -1727,6 +1947,10 @@ function hideStatus() {
     const backgroundJs = `// Chrome Extension Background Service Worker
 chrome.runtime.onInstalled.addListener(() => {
   console.log("YouPick Installed.");
+});
+
+chrome.action.onClicked.addListener((tab) => {
+  chrome.tabs.create({ url: "popup.html" });
 });`;
 
     zip.file("background.js", backgroundJs);
