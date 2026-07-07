@@ -774,8 +774,9 @@ app.get("/api/extension/download", async (req, res) => {
         </div>
 
         <div class="right-col">
-          <div id="trendsContainer" class="trends-section hidden">
+          <div id="trendsContainer" class="trends-section">
             <h3 class="section-title">Trending in Category</h3>
+            <div id="categoryChips" class="category-chips-row"></div>
             <div id="trendsList" class="trends-list">
               <!-- Dynamic trends will load here -->
             </div>
@@ -1285,6 +1286,38 @@ app.get("/api/extension/download", async (req, res) => {
   color: #10b981;
   font-weight: 600;
   margin-left: 4px;
+}
+
+.category-chips-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 10px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.category-chip {
+  padding: 3px 8px;
+  font-size: 10px;
+  border-radius: 9999px;
+  border: 1px solid #cbd5e1;
+  background-color: #f1f5f9;
+  color: #475569;
+  cursor: pointer;
+  font-weight: 500;
+  text-transform: capitalize;
+  transition: all 0.2s;
+}
+
+.category-chip:hover {
+  background-color: #e2e8f0;
+}
+
+.category-chip.active {
+  background-color: #4f46e5;
+  color: white;
+  border-color: #4f46e5;
 }`;
 
     zip.file("popup.css", popupCss);
@@ -1302,150 +1335,9 @@ const CONFIGS = {
 let activeChannel = null;
 let trendWindow = "24h";
 
-const STATIC_TRENDS = {
-  tech: [
-    {
-      title: "I Built a Smart Home That Controls Itself (AI Integrated)",
-      channelTitle: "TechCrafter",
-      viewCount: 450000,
-      thumbnail: "https://images.unsplash.com/photo-1558002038-1055907df827?auto=format&fit=crop&w=400&h=225&q=80"
-    },
-    {
-      title: "Why Everyone is Upgrading to This New Laptop Screen Tech",
-      channelTitle: "DisplayTech",
-      viewCount: 890000,
-      thumbnail: "https://images.unsplash.com/photo-1593642632823-8f785ba67e45?auto=format&fit=crop&w=400&h=225&q=80"
-    },
-    {
-      title: "Building the Ultimate Space-Saving Desk Setup",
-      channelTitle: "MinimalWorkspace",
-      viewCount: 230000,
-      thumbnail: "https://images.unsplash.com/photo-1518455027359-f3f8164ba6bd?auto=format&fit=crop&w=400&h=225&q=80"
-    },
-    {
-      title: "My Honest Review of Gemini 3.5: One Month Later",
-      channelTitle: "AI Frontier",
-      viewCount: 1200000,
-      thumbnail: "https://images.unsplash.com/photo-1677442136019-21780efad99a?auto=format&fit=crop&w=400&h=225&q=80"
-    }
-  ],
-  gaming: [
-    {
-      title: "This Speedrunner Just Broke the World Record by 3 Seconds!",
-      channelTitle: "SpeedyRun",
-      viewCount: 1500000,
-      thumbnail: "https://images.unsplash.com/photo-1538481199705-c710c4e965fc?auto=format&fit=crop&w=400&h=225&q=80"
-    },
-    {
-      title: "10 Hidden Details in the New Open-World RPG You Missed",
-      channelTitle: "LoreMaster",
-      viewCount: 780000,
-      thumbnail: "https://images.unsplash.com/photo-1552820728-8b83bb6b773f?auto=format&fit=crop&w=400&h=225&q=80"
-    },
-    {
-      title: "The Ultimate Guide to Custom Keyboards in 2026",
-      channelTitle: "KeebNerd",
-      viewCount: 320000,
-      thumbnail: "https://images.unsplash.com/photo-1587829741301-dc798b83add3?auto=format&fit=crop&w=400&h=225&q=80"
-    }
-  ],
-  finance: [
-    {
-      title: "The 2026 Housing Market is Changing. Here's My Plan.",
-      channelTitle: "WealthVision",
-      viewCount: 540000,
-      thumbnail: "https://images.unsplash.com/photo-1560518883-ce09059eeffa?auto=format&fit=crop&w=400&h=225&q=80"
-    },
-    {
-      title: "How I Live Comfortably on Less Than $2,000 a Month",
-      channelTitle: "BudgetSmart",
-      viewCount: 1210000,
-      thumbnail: "https://images.unsplash.com/photo-1559526324-4b87b5e36e44?auto=format&fit=crop&w=400&h=225&q=80"
-    }
-  ],
-  cooking: [
-    {
-      title: "3 Level-Up Secrets for Restaurant-Quality Pasta at Home",
-      channelTitle: "SauceCraft",
-      viewCount: 980000,
-      thumbnail: "https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?auto=format&fit=crop&w=400&h=225&q=80"
-    },
-    {
-      title: "The Only Bread Recipe You Need (No Kneading, 4 Ingredients)",
-      channelTitle: "SourdoughNerd",
-      viewCount: 2200000,
-      thumbnail: "https://images.unsplash.com/photo-1549931319-a545dcf3bc73?auto=format&fit=crop&w=400&h=225&q=80"
-    }
-  ],
-  lifestyle: [
-    {
-      title: "A Realistic Day in My Life (Balancing Freelancing & Fitness)",
-      channelTitle: "DailyRoutine",
-      viewCount: 310000,
-      thumbnail: "https://images.unsplash.com/photo-1476480862126-209bfaa8edc8?auto=format&fit=crop&w=400&h=225&q=80"
-    },
-    {
-      title: "I Tried a 30-Day Digital Detox. Here's What Happened to My Brain.",
-      channelTitle: "MindFlow",
-      viewCount: 1450000,
-      thumbnail: "https://images.unsplash.com/photo-1506126613408-eca07ce68773?auto=format&fit=crop&w=400&h=225&q=80"
-    }
-  ],
-  travel: [
-    {
-      title: "I Spent 72 Hours in a Tokyo Capsule Hotel (Honest Review)",
-      channelTitle: "WanderlustSolo",
-      viewCount: 1800000,
-      thumbnail: "https://images.unsplash.com/photo-1503899036084-c55cdd92da26?auto=format&fit=crop&w=400&h=225&q=80"
-    },
-    {
-      title: "The Ultimate Backpacker Guide to Southeast Asia in 2026",
-      channelTitle: "BudgetTravels",
-      viewCount: 620000,
-      thumbnail: "https://images.unsplash.com/photo-1527631746610-bca00a040d60?auto=format&fit=crop&w=400&h=225&q=80"
-    }
-  ],
-  shorts: [
-    {
-      title: "Never chop onions like this again! 🧅 #shorts",
-      channelTitle: "KitchenHacks",
-      viewCount: 4500000,
-      thumbnail: "https://images.unsplash.com/photo-1508313880080-c4bef0730395?auto=format&fit=crop&w=400&h=225&q=80"
-    },
-    {
-      title: "This iPhone setting is a lifesaver! 📱 #techshorts",
-      channelTitle: "TechTipsShorts",
-      viewCount: 8900000,
-      thumbnail: "https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?auto=format&fit=crop&w=400&h=225&q=80"
-    }
-  ],
-  kids: [
-    {
-      title: "The Wheels on the Bus | Nursery Rhymes & Kids Songs",
-      channelTitle: "BabyTune",
-      viewCount: 2500000,
-      thumbnail: "https://images.unsplash.com/photo-1596461404969-9ae70f2830c1?auto=format&fit=crop&w=400&h=225&q=80"
-    },
-    {
-      title: "Learn Colors with 3D Toy Cars & Cartoon Trains",
-      channelTitle: "KidZone Animation",
-      viewCount: 1800000,
-      thumbnail: "https://images.unsplash.com/photo-1515488042361-404e9250afef?auto=format&fit=crop&w=400&h=225&q=80"
-    },
-    {
-      title: "Johny Johny Yes Papa - Safe & Fun Educational Rhymes",
-      channelTitle: "TinyRhymes",
-      viewCount: 4200000,
-      thumbnail: "https://images.unsplash.com/photo-1545558014-8692077e9b5c?auto=format&fit=crop&w=400&h=225&q=80"
-    },
-    {
-      title: "ABC Song & Alphabet Learning Adventures for Toddlers",
-      channelTitle: "AlphabetAcademy",
-      viewCount: 950000,
-      thumbnail: "https://images.unsplash.com/photo-1503676260728-1c00da094a0b?auto=format&fit=crop&w=400&h=225&q=80"
-    }
-  ]
-};
+const STATIC_TRENDS = ${JSON.stringify(STATIC_TRENDS)};
+let selectedNiche = "kids";
+const ALL_CATEGORIES = ["tech", "gaming", "finance", "cooking", "lifestyle", "travel", "kids"];
 
 const MOCK_SUGGESTIONS = {
   tech: [
@@ -1685,13 +1577,15 @@ document.addEventListener("DOMContentLoaded", () => {
         document.getElementById("btnGenerate").removeAttribute("disabled");
         // Restore channel query input value
         document.getElementById("inputChannel").value = activeChannel.customUrl || activeChannel.title || "";
-        loadNicheTrends();
       }
       
       // Load last generated ideas
       if (res.generatedIdeas) {
         renderIdeas(res.generatedIdeas);
       }
+
+      // ALWAYS load trends initially!
+      loadNicheTrends();
     } else {
       document.getElementById("activationView").classList.remove("hidden");
       document.getElementById("dashboardView").classList.add("hidden");
@@ -1700,6 +1594,34 @@ document.addEventListener("DOMContentLoaded", () => {
     initUI();
   });
 });
+
+function renderCategoryChips() {
+  const chipsContainer = document.getElementById("categoryChips");
+  if (!chipsContainer) return;
+  chipsContainer.innerHTML = "";
+  
+  ALL_CATEGORIES.forEach(cat => {
+    const chip = document.createElement("button");
+    chip.className = "category-chip" + (cat === selectedNiche ? " active" : "");
+    chip.innerText = cat;
+    chip.addEventListener("click", () => {
+      selectedNiche = cat;
+      loadNicheTrends();
+    });
+    chipsContainer.appendChild(chip);
+  });
+}
+
+function updateCategoryChips(activeCat) {
+  const chips = document.querySelectorAll(".category-chip");
+  chips.forEach(chip => {
+    if (chip.innerText.toLowerCase() === activeCat.toLowerCase()) {
+      chip.classList.add("active");
+    } else {
+      chip.classList.remove("active");
+    }
+  });
+}
 
 function initUI() {
   const btnAnalyze = document.getElementById("btnAnalyze");
@@ -1710,6 +1632,8 @@ function initUI() {
   const btn7d = document.getElementById("btn7d");
   const btnSaveActivation = document.getElementById("btnSaveActivation");
   const btnResetDefault = document.getElementById("btnResetDefault");
+
+  renderCategoryChips();
 
   if (trendWindow === "24h") {
     btn24h.classList.add("active");
@@ -1749,6 +1673,7 @@ function initUI() {
       chrome.storage.local.set(updateData, () => {
         document.getElementById("activationView").classList.add("hidden");
         document.getElementById("dashboardView").classList.remove("hidden");
+        loadNicheTrends();
       });
     });
   }
@@ -1762,9 +1687,7 @@ function initUI() {
     btn24h.classList.add("active");
     btn7d.classList.remove("active");
     chrome.storage.local.set({ trendWindow: "24h" });
-    if (activeChannel) {
-      loadNicheTrends();
-    }
+    loadNicheTrends();
   });
 
   btn7d.addEventListener("click", () => {
@@ -1772,14 +1695,11 @@ function initUI() {
     btn7d.classList.add("active");
     btn24h.classList.remove("active");
     chrome.storage.local.set({ trendWindow: "7d" });
-    if (activeChannel) {
-      loadNicheTrends();
-    }
+    loadNicheTrends();
   });
 }
 
 async function loadNicheTrends() {
-  if (!activeChannel) return;
   const container = document.getElementById("trendsContainer");
   const list = document.getElementById("trendsList");
   if (!container || !list) return;
@@ -1787,11 +1707,13 @@ async function loadNicheTrends() {
   list.innerHTML = '<div style="font-size:11px;color:#94a3b8;text-align:center;padding:12px 0;">Loading trends...</div>';
   container.classList.remove("hidden");
 
+  const currentCategory = activeChannel ? activeChannel.category : selectedNiche;
+
   try {
     let trends = [];
     if (CONFIGS.youtubeApiKey && CONFIGS.youtubeApiKey.length > 5) {
       try {
-        trends = await localFetchTrends(activeChannel.category, trendWindow, CONFIGS.regionCode, CONFIGS.youtubeApiKey);
+        trends = await localFetchTrends(currentCategory, trendWindow, CONFIGS.regionCode, CONFIGS.youtubeApiKey);
       } catch (e) {
         console.warn("Direct YouTube lookup failed, trying proxy:", e);
       }
@@ -1805,7 +1727,7 @@ async function loadNicheTrends() {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            category: activeChannel.category,
+            category: currentCategory,
             window: trendWindow,
             region: CONFIGS.regionCode
           })
@@ -1828,7 +1750,7 @@ async function loadNicheTrends() {
 
     // Ultimate Fail-safe: if both methods failed (e.g. offline or 403 Forbidden on proxy), use local static trends!
     if (trends.length === 0) {
-      const finalCategory = (activeChannel && activeChannel.category ? String(activeChannel.category) : "tech").toLowerCase().trim();
+      const finalCategory = (currentCategory || "tech").toLowerCase().trim();
       const localData = STATIC_TRENDS[finalCategory] || STATIC_TRENDS["tech"];
       trends = localData.map((v, idx) => {
         const publishedAtDate = new Date();
@@ -1858,7 +1780,18 @@ async function loadNicheTrends() {
       return;
     }
 
-    activeChannel.trends = trends;
+    if (activeChannel) {
+      activeChannel.trends = trends;
+    }
+
+    // Update the section title to show the current category
+    const titleElem = container.querySelector(".section-title");
+    if (titleElem) {
+      titleElem.innerHTML = \`Trending in <span style="color:#4f46e5; text-transform:capitalize;">\${currentCategory}</span>\`;
+    }
+
+    // Highlight the active category chip
+    updateCategoryChips(currentCategory);
 
     trends.forEach(t => {
       const item = document.createElement("div");
